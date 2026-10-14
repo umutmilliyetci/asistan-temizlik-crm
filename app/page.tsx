@@ -536,7 +536,7 @@ export default function AsistanCrmDashboard() {
               <input
                 type="text"
                 required
-                placeholder="admin veya personel adı"
+                placeholder="Kullanıcı adınızı girin"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
                 className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-[#209EAD]"
@@ -560,19 +560,15 @@ export default function AsistanCrmDashboard() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-2 gap-2 text-left">
-            <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200/60">
-              <span className="text-[10px] font-bold text-amber-800 uppercase flex items-center gap-1">
-                <Crown className="w-3 h-3 text-amber-600" /> Yönetici
-              </span>
-              <p className="text-[11px] text-slate-600 font-mono mt-0.5">admin / asistan16</p>
-            </div>
-            <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200/60">
-              <span className="text-[10px] font-bold text-blue-800 uppercase flex items-center gap-1">
-                <HardHat className="w-3 h-3 text-blue-600" /> Saha Personeli
-              </span>
-              <p className="text-[11px] text-slate-600 font-mono mt-0.5">murat / 123</p>
-            </div>
+          <div className="mt-5 text-center">
+            <a 
+              href="https://wa.me/905000000000?text=Merhaba,%20Asistan%20Temizlik%20CRM%20giriş%20şifremi%20unuttum,%20yardımcı%20olabilir%20misiniz?" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-xs font-semibold text-slate-500 hover:text-[#209EAD] transition inline-flex items-center gap-1"
+            >
+              Şifremi Unuttum? (Yöneticiye Bağlan)
+            </a>
           </div>
         </div>
       </div>
@@ -592,6 +588,7 @@ export default function AsistanCrmDashboard() {
           <span className="text-[10px] font-semibold text-slate-500 tracking-wider mt-0.5">
             Ütü | Ev Temizliği | Halı Yıkama | Koltuk Yıkama | Kuru Temizleme
           </span>
+
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
