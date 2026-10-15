@@ -425,13 +425,12 @@ export default function AsistanCrmDashboard() {
   const [next30Days, setNext30Days] = useState<any[]>([]);
 
   useEffect(() => {
-    const days: any[] = [];
-    const base = new Date();
+    
     const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
     const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
     for (let i = 0; i < 30; i++) {
-      const d = new Date(base);
-      d.setDate(base.getDate() + i);
+  
+      const d = new Date();
       days.push({
         iso: d.toISOString().split('T')[0],
         dayNum: d.getDate(),
