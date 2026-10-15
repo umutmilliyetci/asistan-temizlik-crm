@@ -463,7 +463,7 @@ export default function AsistanCrmDashboard() {
     payout: '400',
     paymentMethod: 'Nakit' as PaymentMethod,
     status: 'Onaylandı',
-    orderDate: new Date().toISOString().split('T')[0],
+    orderDate: orderDate: "2026-10-15", toISOString().slice(0, 10),
     dailyInsurance: null as 'YES' | 'NO' | null
   });
 
