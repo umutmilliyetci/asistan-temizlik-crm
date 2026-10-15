@@ -10,7 +10,8 @@ import {
   LogOut, 
   Crown, 
   HardHat, 
-  KeyRound 
+  KeyRound,
+  UserPlus
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import OrderModal from './components/OrderModal';
@@ -129,6 +130,38 @@ export default function AsistanCrmDashboard() {
   const [editingStaffPassword, setEditingStaffPassword] = useState<any | null>(null);
   const [newStaffUsername, setNewStaffUsername] = useState('');
   const [newStaffPassword, setNewStaffPassword] = useState('');
+
+  // Yeni Personel Ekleme State'leri
+  const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
+  const [newStaffDept, setNewStaffDept] = useState('Koltuk Yıkama');
+  const [newStaffUser, setNewStaffUser] = useState('');
+  const [newStaffPass, setNewStaffPass] = useState('');
+
+  const handleAddNewStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim()) return;
+
+    const newStaffObj = {
+      id: `STF-${Date.now()}`,
+      name: newStaffName,
+      phone: newStaffPhone || '0500 000 00 00',
+      district: 'Nilüfer',
+      address: 'Merkez',
+      department: newStaffDept,
+      username: newStaffUser.trim() || newStaffName.toLowerCase().replace(/\s+/g, ''),
+      password: newStaffPass.trim() || '123',
+      isFason: false
+    };
+
+    setStaffPool([...staffPool, newStaffObj]);
+    setIsAddStaffModalOpen(false);
+    setNewStaffName('');
+    setNewStaffPhone('');
+    setNewStaffUser('');
+    setNewStaffPass('');
+  };
 
   const [editingOrderCode, setEditingOrderCode] = useState<string | null>(null);
   const [patronPeriod, setPatronPeriod] = useState<PeriodMode>('MONTHLY');
@@ -560,19 +593,6 @@ export default function AsistanCrmDashboard() {
             </button>
           </form>
 
-          {/* SAHA PERSONELİ BÖLÜMÜ / KAYIT ALANI */}
-          <div className="mt-6 pt-5 border-t border-slate-100 text-left">
-            <div className="bg-blue-50 p-3 rounded-xl border border-blue-200/60 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-blue-800 uppercase flex items-center gap-1">
-                  <HardHat className="w-3 h-3 text-blue-600" /> Saha Personeli Kayıtları
-                </span>
-                <p className="text-[11px] text-slate-600 font-mono mt-0.5">Personel Giriş Alanı Aktif</p>
-              </div>
-              <span className="text-xs font-bold text-blue-700 bg-white px-2 py-1 rounded-lg border border-blue-100">Aktif</span>
-            </div>
-          </div>
-
           <div className="mt-4 text-center">
             <a 
               href="https://wa.me/905000000000?text=Merhaba,%20Asistan%20Temizlik%20CRM%20giriş%20şifremi%20unuttum,%20yardımcı%20olabilir%20misiniz?" 
@@ -808,6 +828,12 @@ export default function AsistanCrmDashboard() {
                 <h3 className="font-bold text-base text-slate-900">Saha Personeli & Şifre Yönetimi</h3>
                 <p className="text-xs text-slate-500">Sadece aktif saha personeline şifre verilir (Fason fabrikalar sisteme giriş yapmaz)</p>
               </div>
+              <button 
+                onClick={() => setIsAddStaffModalOpen(true)}
+                className="flex items-center gap-1.5 bg-[#209EAD] hover:bg-[#1b8592] text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" /> Yeni Personel Ekle
+              </button>
             </div>
 
             <table className="w-full text-left text-sm">
@@ -879,6 +905,98 @@ export default function AsistanCrmDashboard() {
           />
         )}
       </main>
+
+      {/* YENİ PERSONEL EKLEME MODALI */}
+      {isAddStaffModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-[#209EAD]" /> Yeni Saha Personeli Ekle
+              </h4>
+              <button onClick={() => setIsAddStaffModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleAddNewStaff} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Personel Adı Soyadı</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Örn: Ahmet Yılmaz"
+                  value={newStaffName}
+                  onChange={(e) => setNewStaffName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon Numarası</label>
+                <input 
+                  type="text" 
+                  placeholder="Örn: 0532 000 00 00"
+                  value={newStaffPhone}
+                  onChange={(e) => setNewStaffPhone(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Branş / Departman</label>
+                <select 
+                  value={newStaffDept}
+                  onChange={(e) => setNewStaffDept(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-medium"
+                >
+                  <option value="Koltuk Yıkama">Koltuk Yıkama</option>
+                  <option value="Ev Temizliği">Ev Temizliği</option>
+                  <option value="Ütü Servisi">Ütü Servisi</option>
+                  <option value="Kuru Temizleme">Kuru Temizleme</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Kullanıcı Adı</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: ahmet"
+                    value={newStaffUser}
+                    onChange={(e) => setNewStaffUser(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Giriş Şifresi</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: 123"
+                    value={newStaffPass}
+                    onChange={(e) => setNewStaffPass(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddStaffModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 rounded-lg"
+                >
+                  İptal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-lg"
+                >
+                  Personeli Kaydet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* PERSONEL ŞİFRE DÜZENLEME MODALI */}
       {editingStaffPassword && (
