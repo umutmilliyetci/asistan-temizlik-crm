@@ -8,7 +8,6 @@ import {
   MessageCircle, 
   Star, 
   LogOut, 
-  HardHat, 
   KeyRound,
   UserPlus,
   Edit3,
@@ -21,13 +20,11 @@ import CampaignPanel from './components/CampaignPanel';
 import PricingPanel, { initialFullPriceList, PriceItem } from './components/PricingPanel';
 import FinancePanel, { Expense } from './components/FinancePanel';
 
-// Doğrudan Sayfa İçinde Güvenli Supabase İstemcisi
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type UserRole = 'ADMIN' | 'STAFF' | null;
-type StaffPeriodMode = 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 type PaymentMethod = 'Nakit' | 'Kredi Kartı / POS' | 'Havale / IBAN' | 'Bekliyor / Açık Hesap';
 type CalendarSlotType = 'ASISTAN' | 'KENDISI';
 
@@ -1497,7 +1494,7 @@ export default function AsistanCrmDashboard() {
                   placeholder="Örn: murat"
                   value={newStaffUsername}
                   onChange={(e) => setNewStaffUsername(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
                 />
               </div>
 
@@ -1509,7 +1506,7 @@ export default function AsistanCrmDashboard() {
                   placeholder="Örn: 123"
                   value={newStaffPassword}
                   onChange={(e) => setNewStaffPassword(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
                 />
               </div>
 
