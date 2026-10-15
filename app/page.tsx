@@ -45,6 +45,7 @@ export default function AsistanCrmDashboard() {
       setUserRole(savedRole);
     }
     fetchWorkOrdersFromSupabase();
+    fetchStaffFromSupabase();
   }, []);
 
   const fetchWorkOrdersFromSupabase = async () => {
@@ -73,7 +74,31 @@ export default function AsistanCrmDashboard() {
         setWorkOrders(formatted);
       }
     } catch (err) {
-      console.error('Supabase bağlantı hatası:', err);
+      console.error('Supabase sipariş çekme hatası:', err);
+    }
+  };
+
+  const fetchStaffFromSupabase = async () => {
+    try {
+      const { data } = await supabase.from('staff_pool').select('*');
+      if (data && data.length > 0) {
+        const formattedStaff = data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          phone: item.phone,
+          district: item.district || 'Nilüfer',
+          address: item.address || 'Merkez',
+          department: item.department,
+          headcount: item.headcount || 1,
+          specialNotes: item.special_notes || '',
+          username: item.username,
+          password: item.password,
+          isFason: item.is_fason
+        }));
+        setStaffPool(formattedStaff);
+      }
+    } catch (err) {
+      console.error('Supabase personel çekme hatası:', err);
     }
   };
 
@@ -133,6 +158,9 @@ export default function AsistanCrmDashboard() {
   const [newStaffUsername, setNewStaffUsername] = useState('');
   const [newStaffPassword, setNewStaffPassword] = useState('');
 
+  // Personel Havuzu State
+  const [staffPool, setStaffPool] = useState<any[]>([]);
+
   // Yeni Personel Ekleme State'leri
   const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
   const [newStaffName, setNewStaffName] = useState('');
@@ -149,7 +177,7 @@ export default function AsistanCrmDashboard() {
   const [editStaffDept, setEditStaffDept] = useState('');
   const [editStaffHeadcount, setEditStaffHeadcount] = useState('1');
 
-  const handleAddNewStaff = (e: React.FormEvent) => {
+  const handleAddNewStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
 
@@ -163,10 +191,17 @@ export default function AsistanCrmDashboard() {
       username: newStaffUser.trim() || newStaffName.toLowerCase().replace(/\s+/g, ''),
       password: newStaffPass.trim() || '123',
       headcount: Number(newStaffHeadcount) || 1,
-      isFason: false
+      is_fason: false,
+      special_notes: ''
     };
 
-    setStaffPool([...staffPool, newStaffObj]);
+    try {
+      await supabase.from('staff_pool').upsert(newStaffObj, { onConflict: 'id' });
+    } catch (err) {
+      console.error('Supabase personel ekleme hatası:', err);
+    }
+
+    setStaffPool([...staffPool, { ...newStaffObj, isFason: false, specialNotes: '' }]);
     setIsAddStaffModalOpen(false);
     setNewStaffName('');
     setNewStaffPhone('');
@@ -175,19 +210,72 @@ export default function AsistanCrmDashboard() {
     setNewStaffHeadcount('1');
   };
 
-  const handleSaveEditedStaff = (e: React.FormEvent) => {
+  const handleSaveEditedStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaffMember) return;
 
-    setStaffPool(staffPool.map(st => st.id === editingStaffMember.id ? {
-      ...st,
+    const updatedObj = {
+      ...editingStaffMember,
       name: editStaffName,
       phone: editStaffPhone,
       department: editStaffDept,
       headcount: Number(editStaffHeadcount) || 1
-    } : st));
+    };
 
+    try {
+      await supabase.from('staff_pool').upsert({
+        id: updatedObj.id,
+        name: updatedObj.name,
+        phone: updatedObj.phone,
+        district: updatedObj.district,
+        address: updatedObj.address,
+        department: updatedObj.department,
+        headcount: updatedObj.headcount,
+        special_notes: updatedObj.specialNotes || '',
+        username: updatedObj.username,
+        password: updatedObj.password,
+        is_fason: updatedObj.isFason
+      }, { onConflict: 'id' });
+    } catch (err) {
+      console.error('Supabase personel güncelleme hatası:', err);
+    }
+
+    setStaffPool(staffPool.map(st => st.id === editingStaffMember.id ? updatedObj : st));
     setEditingStaffMember(null);
+  };
+
+  const handleSaveStaffCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaffPassword) return;
+
+    const updatedSt = {
+      ...editingStaffPassword,
+      username: newStaffUsername,
+      password: newStaffPassword
+    };
+
+    try {
+      await supabase.from('staff_pool').upsert({
+        id: updatedSt.id,
+        name: updatedSt.name,
+        phone: updatedSt.phone,
+        district: updatedSt.district,
+        address: updatedSt.address,
+        department: updatedSt.department,
+        headcount: updatedSt.headcount || 1,
+        special_notes: updatedSt.specialNotes || '',
+        username: newStaffUsername,
+        password: newStaffPassword,
+        is_fason: updatedSt.isFason
+      }, { onConflict: 'id' });
+    } catch (err) {
+      console.error('Supabase şifre güncelleme hatası:', err);
+    }
+
+    setStaffPool(staffPool.map(st => st.id === editingStaffPassword.id ? updatedSt : st));
+    setEditingStaffPassword(null);
+    setNewStaffUsername('');
+    setNewStaffPassword('');
   };
 
   const [editingOrderCode, setEditingOrderCode] = useState<string | null>(null);
@@ -234,28 +322,6 @@ export default function AsistanCrmDashboard() {
     }
     setNext30Days(days);
   }, []);
-
-  const [staffPool, setStaffPool] = useState<any[]>([
-    { id: 'STF-101', name: 'Murat Usta', phone: '0535 210 33 44', district: 'Nilüfer', address: 'İhsaniye Mah.', department: 'Koltuk Yıkama', headcount: 2, specialNotes: 'Kendi makinesi var', username: 'murat', password: '123' },
-    { id: 'STF-102', name: 'Fatma Hanım', phone: '0542 660 77 88', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', headcount: 3, specialNotes: 'Villalarda uzman', username: 'fatma', password: '123' },
-    { id: 'STF-103', name: 'Emine Hanım', phone: '0542 660 77 89', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', headcount: 2, specialNotes: 'Çok hızlı', username: 'emine', password: '123' },
-    { id: 'FASON-1', name: 'Altınpınar Halı Yıkama Fabrikası', phone: '0224 441 XX XX', district: 'Nilüfer', address: 'Çalı Sanayi', department: 'Fason / Dış Tedarik', headcount: 5, isFason: true }
-  ]);
-
-  const handleSaveStaffCredentials = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingStaffPassword) return;
-
-    setStaffPool(staffPool.map(st => st.id === editingStaffPassword.id ? {
-      ...st,
-      username: newStaffUsername,
-      password: newStaffPassword
-    } : st));
-
-    setEditingStaffPassword(null);
-    setNewStaffUsername('');
-    setNewStaffPassword('');
-  };
 
   const [manualSlots, setManualSlots] = useState<any[]>([
     { staffId: 'STF-101', dateStr: '2026-10-15', type: 'KENDISI' }
@@ -852,8 +918,8 @@ export default function AsistanCrmDashboard() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
-                <h3 className="font-bold text-base text-slate-900">Saha Personeli & Şifre Yönetimi</h3>
-                <p className="text-xs text-slate-500">Sadece aktif saha personeline şifre verilir (Fason fabrikalar sisteme giriş yapmaz)</p>
+                <h3 className="font-bold text-base text-slate-900">Saha Personeli & Şifre Yönetimi (Supabase Bulut)</h3>
+                <p className="text-xs text-slate-500">Personel bilgileri ve şifreleri bulutta güvenle saklanır</p>
               </div>
               <button 
                 onClick={() => setIsAddStaffModalOpen(true)}
