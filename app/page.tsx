@@ -11,7 +11,9 @@ import {
   Crown, 
   HardHat, 
   KeyRound,
-  UserPlus
+  UserPlus,
+  Edit3,
+  Users
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import OrderModal from './components/OrderModal';
@@ -138,6 +140,14 @@ export default function AsistanCrmDashboard() {
   const [newStaffDept, setNewStaffDept] = useState('Koltuk Yıkama');
   const [newStaffUser, setNewStaffUser] = useState('');
   const [newStaffPass, setNewStaffPass] = useState('');
+  const [newStaffHeadcount, setNewStaffHeadcount] = useState('1');
+
+  // Personel Düzenleme State'leri
+  const [editingStaffMember, setEditingStaffMember] = useState<any | null>(null);
+  const [editStaffName, setEditStaffName] = useState('');
+  const [editStaffPhone, setEditStaffPhone] = useState('');
+  const [editStaffDept, setEditStaffDept] = useState('');
+  const [editStaffHeadcount, setEditStaffHeadcount] = useState('1');
 
   const handleAddNewStaff = (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,6 +162,7 @@ export default function AsistanCrmDashboard() {
       department: newStaffDept,
       username: newStaffUser.trim() || newStaffName.toLowerCase().replace(/\s+/g, ''),
       password: newStaffPass.trim() || '123',
+      headcount: Number(newStaffHeadcount) || 1,
       isFason: false
     };
 
@@ -161,6 +172,22 @@ export default function AsistanCrmDashboard() {
     setNewStaffPhone('');
     setNewStaffUser('');
     setNewStaffPass('');
+    setNewStaffHeadcount('1');
+  };
+
+  const handleSaveEditedStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaffMember) return;
+
+    setStaffPool(staffPool.map(st => st.id === editingStaffMember.id ? {
+      ...st,
+      name: editStaffName,
+      phone: editStaffPhone,
+      department: editStaffDept,
+      headcount: Number(editStaffHeadcount) || 1
+    } : st));
+
+    setEditingStaffMember(null);
   };
 
   const [editingOrderCode, setEditingOrderCode] = useState<string | null>(null);
@@ -209,10 +236,10 @@ export default function AsistanCrmDashboard() {
   }, []);
 
   const [staffPool, setStaffPool] = useState<any[]>([
-    { id: 'STF-101', name: 'Murat Usta', phone: '0535 210 33 44', district: 'Nilüfer', address: 'İhsaniye Mah.', department: 'Koltuk Yıkama', specialNotes: 'Kendi makinesi var', username: 'murat', password: '123' },
-    { id: 'STF-102', name: 'Fatma Hanım', phone: '0542 660 77 88', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', specialNotes: 'Villalarda uzman', username: 'fatma', password: '123' },
-    { id: 'STF-103', name: 'Emine Hanım', phone: '0542 660 77 89', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', specialNotes: 'Çok hızlı', username: 'emine', password: '123' },
-    { id: 'FASON-1', name: 'Altınpınar Halı Yıkama Fabrikası', phone: '0224 441 XX XX', district: 'Nilüfer', address: 'Çalı Sanayi', department: 'Fason / Dış Tedarik', isFason: true }
+    { id: 'STF-101', name: 'Murat Usta', phone: '0535 210 33 44', district: 'Nilüfer', address: 'İhsaniye Mah.', department: 'Koltuk Yıkama', headcount: 2, specialNotes: 'Kendi makinesi var', username: 'murat', password: '123' },
+    { id: 'STF-102', name: 'Fatma Hanım', phone: '0542 660 77 88', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', headcount: 3, specialNotes: 'Villalarda uzman', username: 'fatma', password: '123' },
+    { id: 'STF-103', name: 'Emine Hanım', phone: '0542 660 77 89', district: 'Osmangazi', address: 'Bağlarbaşı Mah.', department: 'Ev Temizliği', headcount: 2, specialNotes: 'Çok hızlı', username: 'emine', password: '123' },
+    { id: 'FASON-1', name: 'Altınpınar Halı Yıkama Fabrikası', phone: '0224 441 XX XX', district: 'Nilüfer', address: 'Çalı Sanayi', department: 'Fason / Dış Tedarik', headcount: 5, isFason: true }
   ]);
 
   const handleSaveStaffCredentials = (e: React.FormEvent) => {
@@ -841,6 +868,7 @@ export default function AsistanCrmDashboard() {
                 <tr className="text-xs text-slate-500 font-semibold">
                   <th className="py-2 px-3">Personel / Atölye</th>
                   <th className="py-2 px-3">Branş / Tür</th>
+                  <th className="py-2 px-3">Giden Kişi Sayısı</th>
                   <th className="py-2 px-3">Telefon</th>
                   <th className="py-2 px-3">Kullanıcı Adı</th>
                   <th className="py-2 px-3">Şifre</th>
@@ -854,6 +882,11 @@ export default function AsistanCrmDashboard() {
                     <td className="py-3 px-3 text-xs text-slate-600">
                       {st.isFason ? <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">Fason (Giriş Yapmaz)</span> : st.department}
                     </td>
+                    <td className="py-3 px-3 text-xs font-bold text-slate-700">
+                      <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
+                        <Users className="w-3.5 h-3.5 text-[#209EAD]" /> {st.headcount || 1} Kişi
+                      </span>
+                    </td>
                     <td className="py-3 px-3 font-mono text-xs text-slate-600">{st.phone}</td>
                     <td className="py-3 px-3 font-mono text-xs font-bold text-[#209EAD]">
                       {st.isFason ? '-' : (st.username || 'Tanımsız')}
@@ -862,20 +895,35 @@ export default function AsistanCrmDashboard() {
                       {st.isFason ? '-' : (st.password ? '••••' : 'Tanımsız')}
                     </td>
                     <td className="py-3 px-3 text-center">
-                      {!st.isFason ? (
+                      <div className="flex items-center justify-center gap-1.5">
                         <button 
                           onClick={() => {
-                            setEditingStaffPassword(st);
-                            setNewStaffUsername(st.username || '');
-                            setNewStaffPassword(st.password || '');
+                            setEditingStaffMember(st);
+                            setEditStaffName(st.name);
+                            setEditStaffPhone(st.phone);
+                            setEditStaffDept(st.department);
+                            setEditStaffHeadcount(String(st.headcount || 1));
                           }}
-                          className="px-3 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                          className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                          title="Personel Bilgilerini Düzenle"
                         >
-                          <KeyRound className="w-3.5 h-3.5" /> Şifre Belirle
+                          <Edit3 className="w-3 h-3" /> Düzenle
                         </button>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">Giriş Yok</span>
-                      )}
+
+                        {!st.isFason && (
+                          <button 
+                            onClick={() => {
+                              setEditingStaffPassword(st);
+                              setNewStaffUsername(st.username || '');
+                              setNewStaffPassword(st.password || '');
+                            }}
+                            className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                            title="Şifre Belirle"
+                          >
+                            <KeyRound className="w-3 h-3" /> Şifre
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -930,15 +978,28 @@ export default function AsistanCrmDashboard() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon Numarası</label>
-                <input 
-                  type="text" 
-                  placeholder="Örn: 0532 000 00 00"
-                  value={newStaffPhone}
-                  onChange={(e) => setNewStaffPhone(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon Numarası</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: 0532 000 00 00"
+                    value={newStaffPhone}
+                    onChange={(e) => setNewStaffPhone(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Kaç Kişi Gidiyor?</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="10"
+                    value={newStaffHeadcount}
+                    onChange={(e) => setNewStaffHeadcount(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  />
+                </div>
               </div>
 
               <div>
@@ -991,6 +1052,88 @@ export default function AsistanCrmDashboard() {
                   className="px-4 py-1.5 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-lg"
                 >
                   Personeli Kaydet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PERSONEL BİLGİ DÜZENLEME MODALI */}
+      {editingStaffMember && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                <Edit3 className="w-4 h-4 text-[#209EAD]" /> Personel Düzenle: {editingStaffMember.name}
+              </h4>
+              <button onClick={() => setEditingStaffMember(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditedStaff} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Personel Adı</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editStaffName}
+                  onChange={(e) => setEditStaffName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon</label>
+                  <input 
+                    type="text" 
+                    value={editStaffPhone}
+                    onChange={(e) => setEditStaffPhone(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Kaç Kişi Gidiyor?</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="10"
+                    value={editStaffHeadcount}
+                    onChange={(e) => setEditStaffHeadcount(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              {!editingStaffMember.isFason && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Branş / Departman</label>
+                  <select 
+                    value={editStaffDept}
+                    onChange={(e) => setEditStaffDept(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-medium"
+                  >
+                    <option value="Koltuk Yıkama">Koltuk Yıkama</option>
+                    <option value="Ev Temizliği">Ev Temizliği</option>
+                    <option value="Ütü Servisi">Ütü Servisi</option>
+                    <option value="Kuru Temizleme">Kuru Temizleme</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingStaffMember(null)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 rounded-lg"
+                >
+                  İptal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-lg"
+                >
+                  Değişiklikleri Kaydet
                 </button>
               </div>
             </form>
