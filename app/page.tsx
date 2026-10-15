@@ -75,6 +75,8 @@ export default function AsistanCrmDashboard() {
           itemCount: item.item_count || 1
         }));
         setWorkOrders(formatted);
+      } else {
+        setWorkOrders([]);
       }
     } catch (err) {
       console.error('Supabase sipariş hatası:', err);
@@ -99,6 +101,8 @@ export default function AsistanCrmDashboard() {
           isFason: item.is_fason
         }));
         setStaffPool(formattedStaff);
+      } else {
+        setStaffPool([]);
       }
     } catch (err) {
       console.error('Supabase personel hatası:', err);
@@ -122,6 +126,8 @@ export default function AsistanCrmDashboard() {
           lastServiceKey: item.last_service_key || 'HALI'
         }));
         setCustomers(formattedCust);
+      } else {
+        setCustomers([]);
       }
     } catch (err) {
       console.error('Supabase müşteri hatası:', err);
@@ -168,11 +174,8 @@ export default function AsistanCrmDashboard() {
 
   const [priceList, setPriceList] = useState<PriceItem[]>(initialFullPriceList);
 
-  const [expenses, setExpenses] = useState<Expense[]>([
-    { id: 1, title: 'Servis Aracı Mazot (Nilüfer Dağıtım)', category: 'Yakıt / Servis', amount: 850, date: '11.10.2026' },
-    { id: 2, title: 'Halı Poşeti & Ütü Askısı Alımı', category: 'Ambalaj / Askı', amount: 450, date: '10.10.2026' },
-    { id: 3, title: 'Koltuk Leke Sökücü İlaç (5L)', category: 'Deterjan / Kimyasal', amount: 620, date: '09.10.2026' },
-  ]);
+  // Başlangıçta sıfır (boş) kasa/gider listesi
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [printModalOrder, setPrintModalOrder] = useState<any | null>(null);
@@ -440,9 +443,7 @@ export default function AsistanCrmDashboard() {
     setNext30Days(days);
   }, []);
 
-  const [manualSlots, setManualSlots] = useState<any[]>([
-    { staffId: 'STF-101', dateStr: '2026-10-15', type: 'KENDISI' }
-  ]);
+  const [manualSlots, setManualSlots] = useState<any[]>([]);
 
   const [orderCustomerSearch, setOrderCustomerSearch] = useState('');
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState<any | null>(null);
@@ -458,16 +459,16 @@ export default function AsistanCrmDashboard() {
     hasWorkAddress: false,
     workDistrict: 'Nilüfer',
     workAddress: '',
-    total: '2440',
-    payout: '1060',
+    total: '1000',
+    payout: '400',
     paymentMethod: 'Nakit' as PaymentMethod,
     status: 'Onaylandı',
-    orderDate: '2026-10-14',
+    orderDate: new Date().toISOString().split('T')[0],
     dailyInsurance: null as 'YES' | 'NO' | null
   });
 
   const [carpetBasket, setCarpetBasket] = useState<any[]>([
-    { id: 'item-1', priceItemId: 'H1', name: 'Standart Makine Halısı', m2: 12, customerPricePerM2: 110, fasonPricePerM2: 45 }
+    { id: 'item-1', priceItemId: 'H1', name: 'Standart Makine Halısı', m2: 5, customerPricePerM2: 100, fasonPricePerM2: 40 }
   ]);
 
   const serviceNameMap: Record<string, string> = {
@@ -480,91 +481,66 @@ export default function AsistanCrmDashboard() {
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
 
+  // Gerçek verilere dayalı dinamik istatistik hesaplama (Sıfırdan başlar)
+  const totalRevenue = workOrders.reduce((sum, item) => sum + item.total, 0);
+  const totalPayout = workOrders.reduce((sum, item) => sum + item.payout, 0);
+  const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+  const netCashInHand = totalRevenue - totalPayout - totalExpenses;
+  const totalReviewRequests = workOrders.filter(o => o.reviewRequested).length;
+
   const serviceStatsData = {
     DAILY: {
-      label: 'Bugün (14 Ekim 2026)',
-      totalRevenue: 38500,
-      totalCount: 34,
-      netProfit: 25400,
+      label: 'Bugün',
+      totalRevenue: totalRevenue,
+      totalCount: workOrders.length,
+      netProfit: netCashInHand,
       services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: 14, revenue: 9800, payout: 4100, profit: 5700, maxCount: 20, maxRev: 15000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: 3, revenue: 12600, payout: 8400, profit: 4200, maxCount: 6, maxRev: 20000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: 4, revenue: 8800, payout: 6160, profit: 2640, maxCount: 8, maxRev: 15000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: 8, revenue: 4200, payout: 0, profit: 4200, maxCount: 15, maxRev: 8000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: 5, revenue: 3100, payout: 1300, profit: 1800, maxCount: 10, maxRev: 8000, color: '#EC4899' },
+        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#209EAD' },
+        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#10B981' },
+        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#3B82F6' },
+        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#8B5CF6' },
+        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#EC4899' },
       ]
     },
     MONTHLY: {
-      label: 'Ekim 2026 (Bu Ay)',
-      totalRevenue: 525700,
-      totalCount: 459,
-      netProfit: 328900,
+      label: 'Bu Ay',
+      totalRevenue: totalRevenue,
+      totalCount: workOrders.length,
+      netProfit: netCashInHand,
       services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: 185, revenue: 129500, payout: 55500, profit: 74000, maxCount: 250, maxRev: 200000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: 42, revenue: 176400, payout: 117600, profit: 58800, maxCount: 60, maxRev: 250000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: 54, revenue: 118800, payout: 83160, profit: 35640, maxCount: 80, maxRev: 180000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: 110, revenue: 58500, payout: 0, profit: 58500, maxCount: 150, maxRev: 90000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: 68, revenue: 42500, payout: 17800, profit: 24700, maxCount: 100, maxRev: 70000, color: '#EC4899' },
+        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#209EAD' },
+        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#10B981' },
+        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#3B82F6' },
+        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#8B5CF6' },
+        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#EC4899' },
       ]
     },
     YEARLY: {
-      label: '1 Ocak 2026 - Bugüne (Yıllık)',
-      totalRevenue: 4722650,
-      totalCount: 4100,
-      netProfit: 2984500,
+      label: 'Yıllık',
+      totalRevenue: totalRevenue,
+      totalCount: workOrders.length,
+      netProfit: netCashInHand,
       services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: 1640, revenue: 1148000, payout: 492000, profit: 656000, maxCount: 2000, maxRev: 1500000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: 380, revenue: 1596000, payout: 1064000, profit: 532000, maxCount: 500, maxRev: 2000000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: 490, revenue: 1078000, payout: 754600, profit: 323400, maxCount: 650, maxRev: 1400000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: 980, revenue: 519400, payout: 0, profit: 519400, maxCount: 1200, maxRev: 700000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: 610, revenue: 381250, payout: 162000, profit: 219250, maxCount: 800, maxRev: 550000, color: '#EC4899' },
+        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#209EAD' },
+        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#10B981' },
+        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#3B82F6' },
+        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#8B5CF6' },
+        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#EC4899' },
       ]
     }
   };
 
-  const staffPerformanceData = [
-    {
-      name: 'Murat Usta',
-      role: 'Saha Ustası (Koltuk Yıkama)',
-      department: 'Koltuk Yıkama',
-      stats: {
-        WEEKLY: { jobs: 12, revenue: 26400, payout: 18480, netToCompany: 7920 },
-        MONTHLY: { jobs: 54, revenue: 118800, payout: 83160, netToCompany: 35640 },
-        YEARLY: { jobs: 490, revenue: 1078000, payout: 754600, netToCompany: 323400 },
-      }
-    },
-    {
-      name: 'Fatma Hanım',
-      role: 'Ekip Lideri (Ev & Ofis)',
-      department: 'Ev Temizliği',
-      stats: {
-        WEEKLY: { jobs: 6, revenue: 25200, payout: 16800, netToCompany: 8400 },
-        MONTHLY: { jobs: 26, revenue: 109200, payout: 72800, netToCompany: 36400 },
-        YEARLY: { jobs: 240, revenue: 1008000, payout: 672000, netToCompany: 336000 },
-      }
-    },
-    {
-      name: 'Emine Hanım',
-      role: 'Saha Personeli (Ev & Ofis)',
-      department: 'Ev Temizliği',
-      stats: {
-        WEEKLY: { jobs: 5, revenue: 21000, payout: 14000, netToCompany: 7000 },
-        MONTHLY: { jobs: 22, revenue: 92400, payout: 61600, netToCompany: 30800 },
-        YEARLY: { jobs: 210, revenue: 882000, payout: 588000, netToCompany: 294000 },
-      }
-    },
-    {
-      name: 'Altınpınar Halı Fabrikası',
-      role: 'Fason Üretici (Halı)',
-      department: 'Fason / Dış Tedarik',
-      isFason: true,
-      stats: {
-        WEEKLY: { jobs: 42, revenue: 29400, payout: 12600, netToCompany: 16800 },
-        MONTHLY: { jobs: 185, revenue: 129500, payout: 55500, netToCompany: 74000 },
-        YEARLY: { jobs: 1640, revenue: 1148000, payout: 492000, netToCompany: 656000 },
-      }
-    },
-  ];
+  const staffPerformanceData = staffPool.map(st => ({
+    name: st.name,
+    role: st.department || 'Saha Ekibi',
+    department: st.department,
+    isFason: st.isFason,
+    stats: {
+      WEEKLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
+      MONTHLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
+      YEARLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
+    }
+  }));
 
   const getStaffDateStatus = (staff: any, isoDate: string) => {
     const hasOrder = workOrders.some(o => o.orderDate === isoDate && o.staffList.includes(staff.name));
@@ -583,12 +559,6 @@ export default function AsistanCrmDashboard() {
     }
     setSelectedCalendarCell(null);
   };
-
-  const totalRevenue = workOrders.reduce((sum, item) => sum + item.total, 0);
-  const totalPayout = workOrders.reduce((sum, item) => sum + item.payout, 0);
-  const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
-  const netCashInHand = totalRevenue - totalPayout - totalExpenses;
-  const totalReviewRequests = workOrders.filter(o => o.reviewRequested).length;
 
   const filteredOrders = workOrders.filter(order => {
     const matchesService = selectedService === 'ALL' || order.serviceKey === selectedService;
@@ -629,7 +599,7 @@ export default function AsistanCrmDashboard() {
       id: `carpet-${Date.now()}`,
       priceItemId: defaultItem.id,
       name: defaultItem.name,
-      m2: 6,
+      m2: 5,
       customerPricePerM2: defaultItem.customerPrice,
       fasonPricePerM2: defaultItem.fasonPrice
     }]);
@@ -699,7 +669,7 @@ export default function AsistanCrmDashboard() {
     e.preventDefault();
     if (!orderFormData.name || !orderFormData.phone) return;
 
-    const newOrderCode = editingOrderCode || `AST-${1040 + workOrders.length + 1}`;
+    const newOrderCode = editingOrderCode || `AST-${1001 + workOrders.length}`;
     const newCustomerNo = selectedCustomerForOrder ? selectedCustomerForOrder.customerNo : `M-${100 + customers.length + 1}`;
     const calculatedItemCount = orderFormData.serviceKey === 'HALI' ? carpetTotalM2 : 1;
 
@@ -922,41 +892,49 @@ export default function AsistanCrmDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredOrders.map((order) => (
-                    <tr key={order.code} className="hover:bg-slate-50">
-                      <td className="py-3 px-4 font-bold text-xs text-[#209EAD]">{order.customerNo}</td>
-                      <td className="py-3 px-4 font-mono text-xs font-bold">{order.code}</td>
-                      <td className="py-3 px-4 font-semibold">
-                        <div>{order.customer}</div>
-                        <a href={`tel:${order.phone}`} className="text-xs text-emerald-700 font-mono inline-flex items-center gap-1 mt-0.5"><PhoneCall className="w-3 h-3" />{order.phone}</a>
-                      </td>
-                      <td className="py-3 px-4 text-xs">
-                        <span className="font-bold text-slate-800">[{order.serviceDistrict}]</span> {order.serviceAddressDetail}
-                      </td>
-                      <td className="py-3 px-4 text-xs font-medium">{order.service}</td>
-                      <td className="py-3 px-4 text-xs font-bold text-slate-700">{order.paymentMethod}</td>
-                      <td className="py-3 px-4 text-xs">
-                        {order.dailyInsurance === 'YES' && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Sigortalı</span>}
-                        {order.reviewRequested && <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold ml-1">⭐ İstendi</span>}
-                      </td>
-                      <td className="py-3 px-4 font-bold">{order.total} ₺</td>
-                      <td className="py-3 px-4 text-xs font-bold text-[#209EAD]">{order.status}</td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button 
-                            onClick={() => setLabelPrintOrder(order)}
-                            className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1 shadow-xs"
-                            title="Atölye Etiketi Bas (İsimsiz)"
-                          >
-                            <Tag className="w-3.5 h-3.5" /> Etiket Bas
-                          </button>
-                          <button onClick={() => setReviewModalOrder(order)} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded cursor-pointer" title="Google Yorum"><Star className="w-4 h-4 fill-amber-500" /></button>
-                          <button onClick={() => setWhatsAppModalOrder(order)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer" title="WhatsApp"><MessageCircle className="w-4 h-4" /></button>
-                          <button onClick={() => setPrintModalOrder(order)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded cursor-pointer" title="Yazdır"><Printer className="w-4 h-4" /></button>
-                        </div>
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-semibold">
+                        Henüz hiç iş emri bulunmuyor. "Yeni Sipariş" butonuna tıklayarak ilk siparişi ekleyebilirsiniz.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredOrders.map((order) => (
+                      <tr key={order.code} className="hover:bg-slate-50">
+                        <td className="py-3 px-4 font-bold text-xs text-[#209EAD]">{order.customerNo}</td>
+                        <td className="py-3 px-4 font-mono text-xs font-bold">{order.code}</td>
+                        <td className="py-3 px-4 font-semibold">
+                          <div>{order.customer}</div>
+                          <a href={`tel:${order.phone}`} className="text-xs text-emerald-700 font-mono inline-flex items-center gap-1 mt-0.5"><PhoneCall className="w-3 h-3" />{order.phone}</a>
+                        </td>
+                        <td className="py-3 px-4 text-xs">
+                          <span className="font-bold text-slate-800">[{order.serviceDistrict}]</span> {order.serviceAddressDetail}
+                        </td>
+                        <td className="py-3 px-4 text-xs font-medium">{order.service}</td>
+                        <td className="py-3 px-4 text-xs font-bold text-slate-700">{order.paymentMethod}</td>
+                        <td className="py-3 px-4 text-xs">
+                          {order.dailyInsurance === 'YES' && <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Sigortalı</span>}
+                          {order.reviewRequested && <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold ml-1">⭐ İstendi</span>}
+                        </td>
+                        <td className="py-3 px-4 font-bold">{order.total} ₺</td>
+                        <td className="py-3 px-4 text-xs font-bold text-[#209EAD]">{order.status}</td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button 
+                              onClick={() => setLabelPrintOrder(order)}
+                              className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                              title="Atölye Etiketi Bas (İsimsiz)"
+                            >
+                              <Tag className="w-3.5 h-3.5" /> Etiket Bas
+                            </button>
+                            <button onClick={() => setReviewModalOrder(order)} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded cursor-pointer" title="Google Yorum"><Star className="w-4 h-4 fill-amber-500" /></button>
+                            <button onClick={() => setWhatsAppModalOrder(order)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer" title="WhatsApp"><MessageCircle className="w-4 h-4" /></button>
+                            <button onClick={() => setPrintModalOrder(order)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded cursor-pointer" title="Yazdır"><Printer className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -986,19 +964,25 @@ export default function AsistanCrmDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {fieldStaffMembers.map(staff => (
-                    <tr key={staff.id} className="border-b">
-                      <td className="py-2 px-3 font-bold">{staff.name}</td>
-                      {next30Days.map(d => {
-                        const st = getStaffDateStatus(staff, d.iso);
-                        return (
-                          <td key={d.iso} onClick={() => setSelectedCalendarCell({ staff, dateStr: d.iso, displayDate: `${d.dayNum} ${d.monthStr}` })} className="p-1 text-center cursor-pointer">
-                            <span className={`inline-block w-full py-1 rounded text-[10px] font-bold ${st.isBooked ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{st.label}</span>
-                          </td>
-                        );
-                      })}
+                  {fieldStaffMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan={31} className="py-8 text-center text-slate-400 text-xs">Henüz kayıtlı saha personeli bulunmuyor.</td>
                     </tr>
-                  ))}
+                  ) : (
+                    fieldStaffMembers.map(staff => (
+                      <tr key={staff.id} className="border-b">
+                        <td className="py-2 px-3 font-bold">{staff.name}</td>
+                        {next30Days.map(d => {
+                          const st = getStaffDateStatus(staff, d.iso);
+                          return (
+                            <td key={d.iso} onClick={() => setSelectedCalendarCell({ staff, dateStr: d.iso, displayDate: `${d.dayNum} ${d.monthStr}` })} className="p-1 text-center cursor-pointer">
+                              <span className={`inline-block w-full py-1 rounded text-[10px] font-bold ${st.isBooked ? 'bg-amber-100 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{st.label}</span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1032,28 +1016,36 @@ export default function AsistanCrmDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {customers.map(c => (
-                  <tr key={c.customerNo} className="border-b hover:bg-slate-50">
-                    <td className="py-3 px-3 font-bold text-xs text-[#209EAD]">{c.customerNo}</td>
-                    <td className="py-3 px-3 font-bold">{c.name}</td>
-                    <td className="py-3 px-3 font-mono text-xs">{c.phone}</td>
-                    <td className="py-3 px-3 text-xs">[{c.homeDistrict}] {c.homeAddress}</td>
-                    <td className="py-3 px-3 text-center">
-                      <button 
-                        onClick={() => {
-                          setEditingCustomerMember(c);
-                          setEditCustName(c.name);
-                          setEditCustPhone(c.phone);
-                          setEditCustDistrict(c.homeDistrict);
-                          setEditCustAddress(c.homeAddress);
-                        }}
-                        className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
-                      >
-                        <Edit3 className="w-3 h-3" /> Düzenle
-                      </button>
+                {customers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      Henüz kayıtlı müşteri bulunmuyor. "Yeni Müşteri Ekle" butonu ile ilk müşterinizi kaydedebilirsiniz.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  customers.map(c => (
+                    <tr key={c.customerNo} className="border-b hover:bg-slate-50">
+                      <td className="py-3 px-3 font-bold text-xs text-[#209EAD]">{c.customerNo}</td>
+                      <td className="py-3 px-3 font-bold">{c.name}</td>
+                      <td className="py-3 px-3 font-mono text-xs">{c.phone}</td>
+                      <td className="py-3 px-3 text-xs">[{c.homeDistrict}] {c.homeAddress}</td>
+                      <td className="py-3 px-3 text-center">
+                        <button 
+                          onClick={() => {
+                            setEditingCustomerMember(c);
+                            setEditCustName(c.name);
+                            setEditCustPhone(c.phone);
+                            setEditCustDistrict(c.homeDistrict);
+                            setEditCustAddress(c.homeAddress);
+                          }}
+                          className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <Edit3 className="w-3 h-3" /> Düzenle
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -1088,57 +1080,65 @@ export default function AsistanCrmDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {staffPool.map(st => (
-                  <tr key={st.id} className="border-b hover:bg-slate-50">
-                    <td className="py-3 px-3 font-bold text-slate-900">{st.name}</td>
-                    <td className="py-3 px-3 text-xs text-slate-600">
-                      {st.isFason ? <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">Fason (Giriş Yapmaz)</span> : st.department}
-                    </td>
-                    <td className="py-3 px-3 text-xs font-bold text-slate-700">
-                      <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
-                        <Users className="w-3.5 h-3.5 text-[#209EAD]" /> {st.headcount || 1} Kişi
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-mono text-xs text-slate-600">{st.phone}</td>
-                    <td className="py-3 px-3 font-mono text-xs font-bold text-[#209EAD]">
-                      {st.isFason ? '-' : (st.username || 'Tanımsız')}
-                    </td>
-                    <td className="py-3 px-3 font-mono text-xs text-slate-700">
-                      {st.isFason ? '-' : (st.password ? '••••' : 'Tanımsız')}
-                    </td>
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button 
-                          onClick={() => {
-                            setEditingStaffMember(st);
-                            setEditStaffName(st.name);
-                            setEditStaffPhone(st.phone);
-                            setEditStaffDept(st.department);
-                            setEditStaffHeadcount(String(st.headcount || 1));
-                          }}
-                          className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
-                          title="Personel Bilgilerini Düzenle"
-                        >
-                          <Edit3 className="w-3 h-3" /> Düzenle
-                        </button>
-
-                        {!st.isFason && (
-                          <button 
-                            onClick={() => {
-                              setEditingStaffPassword(st);
-                              setNewStaffUsername(st.username || '');
-                              setNewStaffPassword(st.password || '');
-                            }}
-                            className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
-                            title="Şifre Belirle"
-                          >
-                            <KeyRound className="w-3 h-3" /> Şifre
-                          </button>
-                        )}
-                      </div>
+                {staffPool.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400 text-xs font-semibold">
+                      Henüz kayıtlı personel bulunmuyor. "Yeni Personel Ekle" butonuna tıklayarak ekleme yapabilirsiniz.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  staffPool.map(st => (
+                    <tr key={st.id} className="border-b hover:bg-slate-50">
+                      <td className="py-3 px-3 font-bold text-slate-900">{st.name}</td>
+                      <td className="py-3 px-3 text-xs text-slate-600">
+                        {st.isFason ? <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded font-bold">Fason (Giriş Yapmaz)</span> : st.department}
+                      </td>
+                      <td className="py-3 px-3 text-xs font-bold text-slate-700">
+                        <span className="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
+                          <Users className="w-3.5 h-3.5 text-[#209EAD]" /> {st.headcount || 1} Kişi
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 font-mono text-xs text-slate-600">{st.phone}</td>
+                      <td className="py-3 px-3 font-mono text-xs font-bold text-[#209EAD]">
+                        {st.isFason ? '-' : (st.username || 'Tanımsız')}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-xs text-slate-700">
+                        {st.isFason ? '-' : (st.password ? '••••' : 'Tanımsız')}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            onClick={() => {
+                              setEditingStaffMember(st);
+                              setEditStaffName(st.name);
+                              setEditStaffPhone(st.phone);
+                              setEditStaffDept(st.department);
+                              setEditStaffHeadcount(String(st.headcount || 1));
+                            }}
+                            className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                            title="Personel Bilgilerini Düzenle"
+                          >
+                            <Edit3 className="w-3 h-3" /> Düzenle
+                          </button>
+
+                          {!st.isFason && (
+                            <button 
+                              onClick={() => {
+                                setEditingStaffPassword(st);
+                                setNewStaffUsername(st.username || '');
+                                setNewStaffPassword(st.password || '');
+                              }}
+                              className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                              title="Şifre Belirle"
+                            >
+                              <KeyRound className="w-3 h-3" /> Şifre
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
