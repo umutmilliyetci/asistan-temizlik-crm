@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
@@ -9,7 +8,6 @@ import {
   MessageCircle, 
   Star, 
   LogOut, 
-  Crown, 
   HardHat, 
   KeyRound,
   UserPlus,
@@ -19,7 +17,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import OrderModal from './components/OrderModal';
-import PatronReports from './components/PatronReports';
 import CampaignPanel from './components/CampaignPanel';
 import PricingPanel, { initialFullPriceList, PriceItem } from './components/PricingPanel';
 import FinancePanel, { Expense } from './components/FinancePanel';
@@ -30,7 +27,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholde
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type UserRole = 'ADMIN' | 'STAFF' | null;
-type PeriodMode = 'DAILY' | 'MONTHLY' | 'YEARLY';
 type StaffPeriodMode = 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 type PaymentMethod = 'Nakit' | 'Kredi Kartı / POS' | 'Havale / IBAN' | 'Bekliyor / Açık Hesap';
 type CalendarSlotType = 'ASISTAN' | 'KENDISI';
@@ -169,7 +165,7 @@ export default function AsistanCrmDashboard() {
     setPasswordInput('');
   };
 
-  const [activeTab, setActiveTab] = useState<'PATRON' | 'ORDERS' | 'CAMPAIGN' | 'CALENDAR' | 'CUSTOMERS' | 'STAFF' | 'PRICING' | 'FINANCE'>('ORDERS');
+  const [activeTab, setActiveTab] = useState<'ORDERS' | 'CAMPAIGN' | 'CALENDAR' | 'CUSTOMERS' | 'STAFF' | 'PRICING' | 'FINANCE'>('ORDERS');
   const [selectedService, setSelectedService] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -393,9 +389,6 @@ export default function AsistanCrmDashboard() {
   };
 
   const [editingOrderCode, setEditingOrderCode] = useState<string | null>(null);
-  const [patronPeriod, setPatronPeriod] = useState<PeriodMode>('MONTHLY');
-  const [staffPeriod, setStaffPeriod] = useState<StaffPeriodMode>('MONTHLY');
-  const [googleMapsReviewUrl] = useState<string>('https://maps.google.com/?cid=asistan-temizlik-nilufer');
 
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -478,61 +471,6 @@ export default function AsistanCrmDashboard() {
   const totalPayout = workOrders.reduce((sum, item) => sum + item.payout, 0);
   const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
   const netCashInHand = totalRevenue - totalPayout - totalExpenses;
-  const totalReviewRequests = workOrders.filter(o => o.reviewRequested).length;
-
-  const serviceStatsData = {
-    DAILY: {
-      label: 'Bugün',
-      totalRevenue: totalRevenue,
-      totalCount: workOrders.length,
-      netProfit: netCashInHand,
-      services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 10, maxRev: 10000, color: '#EC4899' },
-      ]
-    },
-    MONTHLY: {
-      label: 'Bu Ay',
-      totalRevenue: totalRevenue,
-      totalCount: workOrders.length,
-      netProfit: netCashInHand,
-      services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 50, maxRev: 50000, color: '#EC4899' },
-      ]
-    },
-    YEARLY: {
-      label: 'Yıllık',
-      totalRevenue: totalRevenue,
-      totalCount: workOrders.length,
-      netProfit: netCashInHand,
-      services: [
-        { key: 'HALI', name: 'Halı Yıkama', count: workOrders.filter(o => o.serviceKey === 'HALI').length, revenue: workOrders.filter(o => o.serviceKey === 'HALI').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#209EAD' },
-        { key: 'EV', name: 'Ev Temizliği', count: workOrders.filter(o => o.serviceKey === 'EV').length, revenue: workOrders.filter(o => o.serviceKey === 'EV').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#10B981' },
-        { key: 'KOLTUK', name: 'Koltuk Yıkama', count: workOrders.filter(o => o.serviceKey === 'KOLTUK').length, revenue: workOrders.filter(o => o.serviceKey === 'KOLTUK').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#3B82F6' },
-        { key: 'UTU', name: 'Ütü Servisi', count: workOrders.filter(o => o.serviceKey === 'UTU').length, revenue: workOrders.filter(o => o.serviceKey === 'UTU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#8B5CF6' },
-        { key: 'KURU', name: 'Kuru Temizleme', count: workOrders.filter(o => o.serviceKey === 'KURU').length, revenue: workOrders.filter(o => o.serviceKey === 'KURU').reduce((s, o) => s + o.total, 0), payout: 0, profit: 0, maxCount: 200, maxRev: 200000, color: '#EC4899' },
-      ]
-    }
-  };
-
-  const staffPerformanceData = staffPool.map(st => ({
-    name: st.name,
-    role: st.department || 'Saha Ekibi',
-    department: st.department,
-    isFason: st.isFason,
-    stats: {
-      WEEKLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
-      MONTHLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
-      YEARLY: { jobs: 0, revenue: 0, payout: 0, netToCompany: 0 },
-    }
-  }));
 
   const getStaffDateStatus = (staff: any, isoDate: string) => {
     const hasOrder = workOrders.some(o => o.orderDate === isoDate && o.staffList.includes(staff.name));
@@ -792,9 +730,6 @@ export default function AsistanCrmDashboard() {
 
         <div className="flex items-center gap-2 flex-wrap">
           <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 flex-wrap">
-            {userRole === 'ADMIN' && (
-              <button onClick={() => setActiveTab('PATRON')} className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer ${activeTab === 'PATRON' ? 'bg-amber-600 text-white shadow-xs' : 'text-amber-800'}`}>YÖNETİCİ RAPORLARI</button>
-            )}
             <button onClick={() => setActiveTab('ORDERS')} className={`px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${activeTab === 'ORDERS' ? 'bg-[#209EAD] text-white shadow-xs' : 'text-slate-600'}`}>İş Emirleri</button>
             {userRole === 'ADMIN' && (
               <button onClick={() => setActiveTab('CAMPAIGN')} className={`px-3 py-1.5 text-xs font-bold rounded-md cursor-pointer ${activeTab === 'CAMPAIGN' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-700'}`}>Kampanya & Çapraz Satış</button>
@@ -840,20 +775,7 @@ export default function AsistanCrmDashboard() {
           </div>
         )}
 
-        {/* 1. YÖNETİCİ RAPORLARI */}
-        {activeTab === 'PATRON' && userRole === 'ADMIN' && (
-          <PatronReports
-            patronPeriod={patronPeriod}
-            setPatronPeriod={setPatronPeriod}
-            staffPeriod={staffPeriod}
-            setStaffPeriod={setStaffPeriod}
-            serviceStatsData={serviceStatsData}
-            staffPerformanceData={staffPerformanceData}
-            totalReviewRequests={totalReviewRequests}
-          />
-        )}
-
-        {/* 2. İŞ EMİRLERİ TABLOSU */}
+        {/* 1. İŞ EMİRLERİ TABLOSU */}
         {activeTab === 'ORDERS' && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -933,7 +855,7 @@ export default function AsistanCrmDashboard() {
           </div>
         )}
 
-        {/* 3. KAMPANYA & ÇAPRAZ SATIŞ */}
+        {/* 2. KAMPANYA & ÇAPRAZ SATIŞ */}
         {activeTab === 'CAMPAIGN' && userRole === 'ADMIN' && (
           <CampaignPanel 
             customers={customers} 
@@ -941,7 +863,7 @@ export default function AsistanCrmDashboard() {
           />
         )}
 
-        {/* 4. SAHA TAKVİMİ */}
+        {/* 3. SAHA TAKVİMİ */}
         {activeTab === 'CALENDAR' && (
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-base">30 Günlük Saha Takvimi</h3>
@@ -981,7 +903,7 @@ export default function AsistanCrmDashboard() {
           </div>
         )}
 
-        {/* 5. MÜŞTERİ REHBERİ */}
+        {/* 4. MÜŞTERİ REHBERİ */}
         {activeTab === 'CUSTOMERS' && userRole === 'ADMIN' && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
@@ -1043,7 +965,7 @@ export default function AsistanCrmDashboard() {
           </div>
         )}
 
-        {/* 6. PERSONEL HAVUZU & ŞİFRE YÖNETİMİ */}
+        {/* 5. PERSONEL HAVUZU & ŞİFRE YÖNETİMİ */}
         {activeTab === 'STAFF' && userRole === 'ADMIN' && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
@@ -1136,7 +1058,7 @@ export default function AsistanCrmDashboard() {
           </div>
         )}
 
-        {/* 7. FİYAT LİSTESİ */}
+        {/* 6. FİYAT LİSTESİ */}
         {activeTab === 'PRICING' && userRole === 'ADMIN' && (
           <PricingPanel 
             priceList={priceList} 
@@ -1144,7 +1066,7 @@ export default function AsistanCrmDashboard() {
           />
         )}
 
-        {/* 8. KASA & FİNANS */}
+        {/* 7. KASA & FİNANS */}
         {activeTab === 'FINANCE' && userRole === 'ADMIN' && (
           <FinancePanel 
             workOrders={workOrders}
@@ -1319,7 +1241,6 @@ export default function AsistanCrmDashboard() {
               <button onClick={() => setLabelPrintOrder(null)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
             </div>
 
-            {/* ETİKET ALANI (YAZDIRMAYA ÖZEL) */}
             <div id="printable-label" className="border-4 border-dashed border-slate-800 p-6 rounded-2xl bg-amber-50/40 space-y-3 text-center">
               <div>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">SİPARİŞ / FİŞ NO</span>
