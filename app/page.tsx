@@ -174,8 +174,6 @@ export default function AsistanCrmDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [priceList, setPriceList] = useState<PriceItem[]>(initialFullPriceList);
-
-  // Başlangıçta sıfır (boş) kasa/gider listesi
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
@@ -189,10 +187,8 @@ export default function AsistanCrmDashboard() {
   const [newStaffUsername, setNewStaffUsername] = useState('');
   const [newStaffPassword, setNewStaffPassword] = useState('');
 
-  // Personel Havuzu State
   const [staffPool, setStaffPool] = useState<any[]>([]);
 
-  // Yeni Personel Ekleme State'leri
   const [isAddStaffModalOpen, setIsAddStaffModalOpen] = useState(false);
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
@@ -201,14 +197,12 @@ export default function AsistanCrmDashboard() {
   const [newStaffPass, setNewStaffPass] = useState('');
   const [newStaffHeadcount, setNewStaffHeadcount] = useState('1');
 
-  // Personel Düzenleme State'leri
   const [editingStaffMember, setEditingStaffMember] = useState<any | null>(null);
   const [editStaffName, setEditStaffName] = useState('');
   const [editStaffPhone, setEditStaffPhone] = useState('');
   const [editStaffDept, setEditStaffDept] = useState('');
   const [editStaffHeadcount, setEditStaffHeadcount] = useState('1');
 
-  // Müşteri Havuzu State
   const [customers, setCustomers] = useState<any[]>([]);
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [newCustName, setNewCustName] = useState('');
@@ -216,7 +210,6 @@ export default function AsistanCrmDashboard() {
   const [newCustDistrict, setNewCustDistrict] = useState('Nilüfer');
   const [newCustAddress, setNewCustAddress] = useState('');
 
-  // Müşteri Düzenleme State'leri
   const [editingCustomerMember, setEditingCustomerMember] = useState<any | null>(null);
   const [editCustName, setEditCustName] = useState('');
   const [editCustPhone, setEditCustPhone] = useState('');
@@ -426,12 +419,12 @@ export default function AsistanCrmDashboard() {
   const [next30Days, setNext30Days] = useState<any[]>([]);
 
   useEffect(() => {
-    
+    const days = [];
     const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
     const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
     for (let i = 0; i < 30; i++) {
-  
       const d = new Date();
+      d.setDate(d.getDate() + i);
       days.push({
         iso: d.toISOString().split('T')[0],
         dayNum: d.getDate(),
@@ -463,7 +456,7 @@ export default function AsistanCrmDashboard() {
     payout: '400',
     paymentMethod: 'Nakit' as PaymentMethod,
     status: 'Onaylandı',
-    orderDate: orderDate: "2026-10-15", toISOString().slice(0, 10),
+    orderDate: new Date().toISOString().slice(0, 10),
     dailyInsurance: null as 'YES' | 'NO' | null
   });
 
@@ -481,7 +474,6 @@ export default function AsistanCrmDashboard() {
 
   const [workOrders, setWorkOrders] = useState<any[]>([]);
 
-  // Gerçek verilere dayalı dinamik istatistik hesaplama (Sıfırdan başlar)
   const totalRevenue = workOrders.reduce((sum, item) => sum + item.total, 0);
   const totalPayout = workOrders.reduce((sum, item) => sum + item.payout, 0);
   const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
