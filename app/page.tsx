@@ -13,7 +13,8 @@ import {
   KeyRound,
   UserPlus,
   Edit3,
-  Users
+  Users,
+  Tag
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import OrderModal from './components/OrderModal';
@@ -46,6 +47,7 @@ export default function AsistanCrmDashboard() {
     }
     fetchWorkOrdersFromSupabase();
     fetchStaffFromSupabase();
+    fetchCustomersFromSupabase();
   }, []);
 
   const fetchWorkOrdersFromSupabase = async () => {
@@ -69,12 +71,13 @@ export default function AsistanCrmDashboard() {
           status: item.status,
           orderDate: item.order_date,
           dailyInsurance: item.daily_insurance,
-          reviewRequested: item.review_requested
+          reviewRequested: item.review_requested,
+          itemCount: item.item_count || 1
         }));
         setWorkOrders(formatted);
       }
     } catch (err) {
-      console.error('Supabase sipariş çekme hatası:', err);
+      console.error('Supabase sipariş hatası:', err);
     }
   };
 
@@ -98,7 +101,30 @@ export default function AsistanCrmDashboard() {
         setStaffPool(formattedStaff);
       }
     } catch (err) {
-      console.error('Supabase personel çekme hatası:', err);
+      console.error('Supabase personel hatası:', err);
+    }
+  };
+
+  const fetchCustomersFromSupabase = async () => {
+    try {
+      const { data } = await supabase.from('customers').select('*').order('created_at', { ascending: false });
+      if (data && data.length > 0) {
+        const formattedCust = data.map((item: any) => ({
+          id: item.id,
+          customerNo: item.customer_no,
+          name: item.name,
+          phone: item.phone,
+          homeDistrict: item.home_district || 'Nilüfer',
+          homeAddress: item.home_address || '',
+          hasWorkAddress: item.has_work_address || false,
+          workDistrict: item.work_district || 'Nilüfer',
+          workAddress: item.work_address || '',
+          lastServiceKey: item.last_service_key || 'HALI'
+        }));
+        setCustomers(formattedCust);
+      }
+    } catch (err) {
+      console.error('Supabase müşteri hatası:', err);
     }
   };
 
@@ -153,6 +179,7 @@ export default function AsistanCrmDashboard() {
   const [whatsAppModalOrder, setWhatsAppModalOrder] = useState<any | null>(null);
   const [reviewModalOrder, setReviewModalOrder] = useState<any | null>(null);
   const [selectedCalendarCell, setSelectedCalendarCell] = useState<any | null>(null);
+  const [labelPrintOrder, setLabelPrintOrder] = useState<any | null>(null);
 
   const [editingStaffPassword, setEditingStaffPassword] = useState<any | null>(null);
   const [newStaffUsername, setNewStaffUsername] = useState('');
@@ -177,6 +204,96 @@ export default function AsistanCrmDashboard() {
   const [editStaffDept, setEditStaffDept] = useState('');
   const [editStaffHeadcount, setEditStaffHeadcount] = useState('1');
 
+  // Müşteri Havuzu State
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustDistrict, setNewCustDistrict] = useState('Nilüfer');
+  const [newCustAddress, setNewCustAddress] = useState('');
+
+  // Müşteri Düzenleme State'leri
+  const [editingCustomerMember, setEditingCustomerMember] = useState<any | null>(null);
+  const [editCustName, setEditCustName] = useState('');
+  const [editCustPhone, setEditCustPhone] = useState('');
+  const [editCustDistrict, setEditCustDistrict] = useState('');
+  const [editCustAddress, setEditCustAddress] = useState('');
+
+  const handleAddNewCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustName.trim() || !newCustPhone.trim()) return;
+
+    const newCustObj = {
+      id: Date.now(),
+      customer_no: `M-${100 + customers.length + 1}`,
+      name: newCustName,
+      phone: newCustPhone,
+      home_district: newCustDistrict,
+      home_address: newCustAddress,
+      has_work_address: false,
+      work_district: 'Nilüfer',
+      work_address: '',
+      last_service_key: 'HALI'
+    };
+
+    try {
+      await supabase.from('customers').upsert(newCustObj, { onConflict: 'id' });
+    } catch (err) {
+      console.error('Müşteri ekleme hatası:', err);
+    }
+
+    setCustomers([{
+      id: newCustObj.id,
+      customerNo: newCustObj.customer_no,
+      name: newCustObj.name,
+      phone: newCustObj.phone,
+      homeDistrict: newCustObj.home_district,
+      homeAddress: newCustObj.home_address,
+      hasWorkAddress: false,
+      workDistrict: 'Nilüfer',
+      workAddress: '',
+      lastServiceKey: 'HALI'
+    }, ...customers]);
+
+    setIsAddCustomerModalOpen(false);
+    setNewCustName('');
+    setNewCustPhone('');
+    setNewCustAddress('');
+  };
+
+  const handleSaveEditedCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomerMember) return;
+
+    const updatedCust = {
+      ...editingCustomerMember,
+      name: editCustName,
+      phone: editCustPhone,
+      homeDistrict: editCustDistrict,
+      homeAddress: editCustAddress
+    };
+
+    try {
+      await supabase.from('customers').upsert({
+        id: updatedCust.id,
+        customer_no: updatedCust.customerNo,
+        name: updatedCust.name,
+        phone: updatedCust.phone,
+        home_district: updatedCust.homeDistrict,
+        home_address: updatedCust.homeAddress,
+        has_work_address: updatedCust.hasWorkAddress,
+        work_district: updatedCust.workDistrict,
+        work_address: updatedCust.workAddress,
+        last_service_key: updatedCust.lastServiceKey
+      }, { onConflict: 'id' });
+    } catch (err) {
+      console.error('Müşteri güncelleme hatası:', err);
+    }
+
+    setCustomers(customers.map(c => c.id === editingCustomerMember.id ? updatedCust : c));
+    setEditingCustomerMember(null);
+  };
+
   const handleAddNewStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
@@ -198,7 +315,7 @@ export default function AsistanCrmDashboard() {
     try {
       await supabase.from('staff_pool').upsert(newStaffObj, { onConflict: 'id' });
     } catch (err) {
-      console.error('Supabase personel ekleme hatası:', err);
+      console.error('Personel ekleme hatası:', err);
     }
 
     setStaffPool([...staffPool, { ...newStaffObj, isFason: false, specialNotes: '' }]);
@@ -237,7 +354,7 @@ export default function AsistanCrmDashboard() {
         is_fason: updatedObj.isFason
       }, { onConflict: 'id' });
     } catch (err) {
-      console.error('Supabase personel güncelleme hatası:', err);
+      console.error('Personel güncelleme hatası:', err);
     }
 
     setStaffPool(staffPool.map(st => st.id === editingStaffMember.id ? updatedObj : st));
@@ -269,7 +386,7 @@ export default function AsistanCrmDashboard() {
         is_fason: updatedSt.isFason
       }, { onConflict: 'id' });
     } catch (err) {
-      console.error('Supabase şifre güncelleme hatası:', err);
+      console.error('Şifre güncelleme hatası:', err);
     }
 
     setStaffPool(staffPool.map(st => st.id === editingStaffPassword.id ? updatedSt : st));
@@ -325,14 +442,6 @@ export default function AsistanCrmDashboard() {
 
   const [manualSlots, setManualSlots] = useState<any[]>([
     { staffId: 'STF-101', dateStr: '2026-10-15', type: 'KENDISI' }
-  ]);
-
-  const [customers] = useState<any[]>([
-    { id: 101, customerNo: 'M-101', name: 'Ahmet Karadeniz', phone: '05324101122', homeDistrict: 'Nilüfer', homeAddress: 'Balat Mah. Çamlık Sitesi No:4', hasWorkAddress: true, workDistrict: 'Nilüfer', workAddress: 'NOSAB 110. Sokak', lastServiceKey: 'HALI' },
-    { id: 102, customerNo: 'M-102', name: 'Zeynep Kaya', phone: '05442334455', homeDistrict: 'Nilüfer', homeAddress: 'Özlüce 29 Ekim Mah.', hasWorkAddress: false, lastServiceKey: 'EV' },
-    { id: 103, customerNo: 'M-103', name: 'Bursa Tekstil Ofis', phone: '02244528899', homeDistrict: 'Osmangazi', homeAddress: 'Demirtaş OSB 4. Sokak No:18', hasWorkAddress: false, lastServiceKey: 'EV' },
-    { id: 104, customerNo: 'M-104', name: 'Mehmet Demir', phone: '05338745566', homeDistrict: 'Yıldırım', homeAddress: 'Millet Mah. Vatan Cad. No:8', hasWorkAddress: true, workDistrict: 'Osmangazi', workAddress: 'Santral Garaj Kat:3', lastServiceKey: 'HALI' },
-    { id: 105, customerNo: 'M-105', name: 'Selin Doğan', phone: '05306557788', homeDistrict: 'Mudanya', homeAddress: 'Bademli Beyaz Villalar No:2', hasWorkAddress: false, lastServiceKey: 'KOLTUK' }
   ]);
 
   const [orderCustomerSearch, setOrderCustomerSearch] = useState('');
@@ -592,6 +701,7 @@ export default function AsistanCrmDashboard() {
 
     const newOrderCode = editingOrderCode || `AST-${1040 + workOrders.length + 1}`;
     const newCustomerNo = selectedCustomerForOrder ? selectedCustomerForOrder.customerNo : `M-${100 + customers.length + 1}`;
+    const calculatedItemCount = orderFormData.serviceKey === 'HALI' ? carpetTotalM2 : 1;
 
     const newOrder: any = {
       code: newOrderCode,
@@ -609,7 +719,8 @@ export default function AsistanCrmDashboard() {
       paymentMethod: orderFormData.paymentMethod,
       status: orderFormData.status,
       orderDate: orderFormData.orderDate,
-      dailyInsurance: orderFormData.dailyInsurance
+      dailyInsurance: orderFormData.dailyInsurance,
+      itemCount: calculatedItemCount
     };
 
     try {
@@ -630,7 +741,8 @@ export default function AsistanCrmDashboard() {
         status: newOrder.status,
         order_date: newOrder.orderDate,
         daily_insurance: newOrder.dailyInsurance,
-        review_requested: false
+        review_requested: false,
+        item_count: newOrder.itemCount
       }, { onConflict: 'code' });
     } catch (err) {
       console.error('Kayıt hatası:', err);
@@ -806,14 +918,14 @@ export default function AsistanCrmDashboard() {
                     <th className="py-3 px-4">Sigorta & Yorum</th>
                     <th className="py-3 px-4">Tutar</th>
                     <th className="py-3 px-4">Durum</th>
-                    <th className="py-3 px-4 text-center">İşlemler</th>
+                    <th className="py-3 px-4 text-center">İşlemler / Etiket Bas</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredOrders.map((order) => (
                     <tr key={order.code} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-bold text-xs text-[#209EAD]">{order.customerNo}</td>
-                      <td className="py-3 px-4 font-mono text-xs">{order.code}</td>
+                      <td className="py-3 px-4 font-mono text-xs font-bold">{order.code}</td>
                       <td className="py-3 px-4 font-semibold">
                         <div>{order.customer}</div>
                         <a href={`tel:${order.phone}`} className="text-xs text-emerald-700 font-mono inline-flex items-center gap-1 mt-0.5"><PhoneCall className="w-3 h-3" />{order.phone}</a>
@@ -830,7 +942,14 @@ export default function AsistanCrmDashboard() {
                       <td className="py-3 px-4 font-bold">{order.total} ₺</td>
                       <td className="py-3 px-4 text-xs font-bold text-[#209EAD]">{order.status}</td>
                       <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            onClick={() => setLabelPrintOrder(order)}
+                            className="px-2.5 py-1 bg-[#E6F7F9] text-[#209EAD] hover:bg-[#209EAD] hover:text-white rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                            title="Atölye Etiketi Bas (İsimsiz)"
+                          >
+                            <Tag className="w-3.5 h-3.5" /> Etiket Bas
+                          </button>
                           <button onClick={() => setReviewModalOrder(order)} className="p-1.5 text-amber-600 hover:bg-amber-50 rounded cursor-pointer" title="Google Yorum"><Star className="w-4 h-4 fill-amber-500" /></button>
                           <button onClick={() => setWhatsAppModalOrder(order)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer" title="WhatsApp"><MessageCircle className="w-4 h-4" /></button>
                           <button onClick={() => setPrintModalOrder(order)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded cursor-pointer" title="Yazdır"><Printer className="w-4 h-4" /></button>
@@ -888,8 +1007,20 @@ export default function AsistanCrmDashboard() {
 
         {/* 5. MÜŞTERİ REHBERİ */}
         {activeTab === 'CUSTOMERS' && userRole === 'ADMIN' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5">
-            <h3 className="font-bold text-base mb-3">Müşteri Rehberi</h3>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Müşteri Rehberi (Supabase Bulut)</h3>
+                <p className="text-xs text-slate-500">Müşteri bilgileri sistemde kalıcı olarak saklanır ve güncellenebilir</p>
+              </div>
+              <button 
+                onClick={() => setIsAddCustomerModalOpen(true)}
+                className="flex items-center gap-1.5 bg-[#209EAD] hover:bg-[#1b8592] text-white px-3.5 py-2 rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" /> Yeni Müşteri Ekle
+              </button>
+            </div>
+
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 border-b">
                 <tr className="text-xs text-slate-500 font-semibold">
@@ -897,15 +1028,30 @@ export default function AsistanCrmDashboard() {
                   <th className="py-2 px-3">Müşteri</th>
                   <th className="py-2 px-3">Telefon</th>
                   <th className="py-2 px-3">Ev Adresi</th>
+                  <th className="py-2 px-3 text-center">İşlem</th>
                 </tr>
               </thead>
               <tbody>
                 {customers.map(c => (
                   <tr key={c.customerNo} className="border-b hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-bold text-xs text-[#209EAD]">{c.customerNo}</td>
-                    <td className="py-2.5 px-3 font-bold">{c.name}</td>
-                    <td className="py-2.5 px-3 font-mono text-xs">{c.phone}</td>
-                    <td className="py-2.5 px-3 text-xs">[{c.homeDistrict}] {c.homeAddress}</td>
+                    <td className="py-3 px-3 font-bold text-xs text-[#209EAD]">{c.customerNo}</td>
+                    <td className="py-3 px-3 font-bold">{c.name}</td>
+                    <td className="py-3 px-3 font-mono text-xs">{c.phone}</td>
+                    <td className="py-3 px-3 text-xs">[{c.homeDistrict}] {c.homeAddress}</td>
+                    <td className="py-3 px-3 text-center">
+                      <button 
+                        onClick={() => {
+                          setEditingCustomerMember(c);
+                          setEditCustName(c.name);
+                          setEditCustPhone(c.phone);
+                          setEditCustDistrict(c.homeDistrict);
+                          setEditCustAddress(c.homeAddress);
+                        }}
+                        className="px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-bold transition cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3 h-3" /> Düzenle
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1019,6 +1165,217 @@ export default function AsistanCrmDashboard() {
           />
         )}
       </main>
+
+      {/* YENİ MÜŞTERİ EKLEME MODALI */}
+      {isAddCustomerModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4 text-[#209EAD]" /> Yeni Müşteri Kaydı
+              </h4>
+              <button onClick={() => setIsAddCustomerModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleAddNewCustomer} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Müşteri Adı Soyadı</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Örn: Ayşe Demir"
+                  value={newCustName}
+                  onChange={(e) => setNewCustName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon Numarası</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Örn: 0532 000 00 00"
+                  value={newCustPhone}
+                  onChange={(e) => setNewCustPhone(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">İlçe</label>
+                <select 
+                  value={newCustDistrict}
+                  onChange={(e) => setNewCustDistrict(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-medium"
+                >
+                  {allowedDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Adres Detayı</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Mahalle, Sokak, No, Daire..."
+                  value={newCustAddress}
+                  onChange={(e) => setNewCustAddress(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddCustomerModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 rounded-lg"
+                >
+                  İptal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-lg"
+                >
+                  Müşteriyi Kaydet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MÜŞTERİ DÜZENLEME MODALI */}
+      {editingCustomerMember && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h4 className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                <Edit3 className="w-4 h-4 text-[#209EAD]" /> Müşteri Düzenle: {editingCustomerMember.customerNo}
+              </h4>
+              <button onClick={() => setEditingCustomerMember(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveEditedCustomer} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Müşteri Adı</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editCustName}
+                  onChange={(e) => setEditCustName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Telefon</label>
+                <input 
+                  type="text" 
+                  value={editCustPhone}
+                  onChange={(e) => setEditCustPhone(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">İlçe</label>
+                <select 
+                  value={editCustDistrict}
+                  onChange={(e) => setEditCustDistrict(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg font-medium"
+                >
+                  {allowedDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Adres</label>
+                <textarea 
+                  rows={2}
+                  value={editCustAddress}
+                  onChange={(e) => setEditCustAddress(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingCustomerMember(null)}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-100 rounded-lg"
+                >
+                  İptal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-lg"
+                >
+                  Değişiklikleri Kaydet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ETİKET BASMA (İSİMSİZ ATÖLYE FİŞİ) MODALI */}
+      {labelPrintOrder && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4 text-center">
+            <div className="flex justify-between items-center border-b pb-2">
+              <span className="text-xs font-bold text-slate-400 uppercase">Atölye Etiket Önizleme (İsimsiz)</span>
+              <button onClick={() => setLabelPrintOrder(null)} className="text-slate-400 hover:text-slate-600 text-sm font-bold">✕</button>
+            </div>
+
+            {/* ETİKET ALANI (YAZDIRMAYA ÖZEL) */}
+            <div id="printable-label" className="border-4 border-dashed border-slate-800 p-6 rounded-2xl bg-amber-50/40 space-y-3 text-center">
+              <div>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">SİPARİŞ / FİŞ NO</span>
+                <h1 className="text-4xl font-black text-slate-900 font-mono tracking-wider mt-0.5">{labelPrintOrder.code}</h1>
+              </div>
+
+              <div className="py-2 border-y border-dashed border-slate-300 grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase block">MÜŞTERİ KODU</span>
+                  <span className="text-2xl font-black text-[#209EAD] font-mono">{labelPrintOrder.customerNo}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase block">HİZMET TÜRÜ</span>
+                  <span className="text-xs font-extrabold text-slate-800 uppercase mt-1 inline-block">{labelPrintOrder.service}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 block">TARİH</span>
+                  <span className="font-mono font-bold text-slate-800">{labelPrintOrder.orderDate}</span>
+                </div>
+                <div>
+                  <span className="text-[9px] font-bold text-slate-500 block">PARÇA / M²</span>
+                  <span className="font-mono font-extrabold text-slate-900 text-sm">{labelPrintOrder.itemCount || 1} Adet / Birim</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button 
+                onClick={() => setLabelPrintOrder(null)} 
+                className="flex-1 py-2 text-xs font-semibold bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Kapat
+              </button>
+              <button 
+                onClick={() => {
+                  window.print();
+                }} 
+                className="flex-1 py-2 text-xs font-bold text-white bg-[#209EAD] hover:bg-[#1b8592] rounded-xl inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Printer className="w-4 h-4" /> Etiketi Yazdır
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* YENİ PERSONEL EKLEME MODALI */}
       {isAddStaffModalOpen && (
