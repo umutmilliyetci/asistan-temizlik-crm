@@ -560,7 +560,20 @@ export default function AsistanCrmDashboard() {
             </button>
           </form>
 
-          <div className="mt-5 text-center">
+          {/* SAHA PERSONELİ BÖLÜMÜ / KAYIT ALANI */}
+          <div className="mt-6 pt-5 border-t border-slate-100 text-left">
+            <div className="bg-blue-50 p-3 rounded-xl border border-blue-200/60 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-blue-800 uppercase flex items-center gap-1">
+                  <HardHat className="w-3 h-3 text-blue-600" /> Saha Personeli Kayıtları
+                </span>
+                <p className="text-[11px] text-slate-600 font-mono mt-0.5">Personel Giriş Alanı Aktif</p>
+              </div>
+              <span className="text-xs font-bold text-blue-700 bg-white px-2 py-1 rounded-lg border border-blue-100">Aktif</span>
+            </div>
+          </div>
+
+          <div className="mt-4 text-center">
             <a 
               href="https://wa.me/905000000000?text=Merhaba,%20Asistan%20Temizlik%20CRM%20giriş%20şifremi%20unuttum,%20yardımcı%20olabilir%20misiniz?" 
               target="_blank" 
@@ -588,7 +601,6 @@ export default function AsistanCrmDashboard() {
           <span className="text-[10px] font-semibold text-slate-500 tracking-wider mt-0.5">
             Ütü | Ev Temizliği | Halı Yıkama | Koltuk Yıkama | Kuru Temizleme
           </span>
-
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
