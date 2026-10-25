@@ -18,6 +18,23 @@ import {
 } from './components/types';
 
 export default function AsistanMasterCRM() {
+  // --- GÜVENLİK VE GİRİŞ (AUTH) STATE'LERİ ---
+  const ADMIN_PHONE = '5010862000';
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [savedPassword, setSavedPassword] = useState('123456');
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Şifre Değiştirme & Şifremi Unuttum Modalları
+  const [isChangePassModalOpen, setIsChangePassModalOpen] = useState(false);
+  const [oldPassInput, setOldPassInput] = useState('');
+  const [newPassInput, setNewPassInput] = useState('');
+  const [newPassConfirm, setNewPassConfirm] = useState('');
+  const [passMessage, setPassMessage] = useState({ type: '', text: '' });
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+
+  // --- CRM UYGULAMA STATE'LERİ ---
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [dateFilter, setDateFilter] = useState<'today' | 'monthly' | 'custom'>('monthly');
   const [isLoaded, setIsLoaded] = useState(false);
@@ -25,7 +42,7 @@ export default function AsistanMasterCRM() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [locationPhone, setLocationPhone] = useState('');
 
-  const [todayStr, setTodayStr] = useState('24.10.2026');
+  const [todayStr, setTodayStr] = useState('25.10.2026');
 
   useEffect(() => {
     setTodayStr(new Date().toLocaleDateString('tr-TR'));
@@ -54,8 +71,21 @@ export default function AsistanMasterCRM() {
     }
   });
 
+  // Verileri ve Şifreyi Yükle
   useEffect(() => {
     try {
+      const storedPass = localStorage.getItem('asistan_admin_pass_v1');
+      if (storedPass) {
+        setSavedPassword(storedPass);
+      } else {
+        localStorage.setItem('asistan_admin_pass_v1', '123456');
+      }
+
+      const authSession = sessionStorage.getItem('asistan_auth_session');
+      if (authSession === 'active') {
+        setIsAuthenticated(true);
+      }
+
       const savedPrices = localStorage.getItem('asistan_prices_v1');
       const savedStaff = localStorage.getItem('asistan_staff_v1');
       const savedCustomers = localStorage.getItem('asistan_customers_v1');
@@ -78,6 +108,7 @@ export default function AsistanMasterCRM() {
     }
   }, []);
 
+  // Verileri Kaydet
   useEffect(() => {
     if (!isLoaded) return;
     localStorage.setItem('asistan_prices_v1', JSON.stringify(priceCategories));
@@ -88,6 +119,69 @@ export default function AsistanMasterCRM() {
     localStorage.setItem('asistan_transactions_v1', JSON.stringify(transactions));
     localStorage.setItem('asistan_calendar_v1', JSON.stringify(calendarData));
   }, [priceCategories, staffList, customerList, ordersList, expenses, transactions, calendarData, isLoaded]);
+
+  // --- GİRİŞ / ÇIKIŞ / ŞİFRE FONKSİYONLARI ---
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPhone = loginPhone.replace(/\D/g, '').replace(/^0/, '');
+    
+    if (cleanPhone === ADMIN_PHONE && loginPassword === savedPassword) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('asistan_auth_session', 'active');
+      setLoginError('');
+      setLoginPassword('');
+    } else {
+      setLoginError('Kullanıcı adı (Telefon) veya şifre hatalı!');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem('asistan_auth_session');
+    setLoginPhone('');
+    setLoginPassword('');
+  };
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (oldPassInput !== savedPassword) {
+      setPassMessage({ type: 'error', text: 'Mevcut (eski) şifrenizi yanlış girdiniz!' });
+      return;
+    }
+    if (newPassInput.length < 4) {
+      setPassMessage({ type: 'error', text: 'Yeni şifre en az 4 karakter olmalıdır!' });
+      return;
+    }
+    if (newPassInput !== newPassConfirm) {
+      setPassMessage({ type: 'error', text: 'Yeni şifreler birbiriyle eşleşmiyor!' });
+      return;
+    }
+
+    setSavedPassword(newPassInput);
+    localStorage.setItem('asistan_admin_pass_v1', newPassInput);
+    setPassMessage({ type: 'success', text: 'Şifreniz başarıyla güncellendi!' });
+    setOldPassInput('');
+    setNewPassInput('');
+    setNewPassConfirm('');
+
+    setTimeout(() => {
+      setIsChangePassModalOpen(false);
+      setPassMessage({ type: '', text: '' });
+    }, 1500);
+  };
+
+  const handleSendPasswordToPhone = (method: 'whatsapp' | 'sms') => {
+    const message = `🔐 *ASİSTAN TEMİZLİK CRM*\n\nSistem giriş bilgileriniz aşağıdadır:\n👤 *Kullanıcı Adı:* ${ADMIN_PHONE}\n🔑 *Son Kullandığınız Şifre:* ${savedPassword}\n\n_Güvenliğiniz için mesajı okuduktan sonra silebilirsiniz._`;
+    
+    if (method === 'whatsapp') {
+      const waUrl = `https://wa.me/90${ADMIN_PHONE}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+    } else {
+      const smsUrl = `sms:+90${ADMIN_PHONE}?body=${encodeURIComponent(message)}`;
+      window.location.href = smsUrl;
+    }
+    setIsForgotModalOpen(false);
+  };
 
   const totalPricesCount = priceCategories.reduce((acc, cat) => acc + cat.items.length, 0);
 
@@ -120,7 +214,6 @@ export default function AsistanMasterCRM() {
 
   const netCompanyCash = (deliveredTurnover + manualIncome) - (deliveredFasonHakedis + manualOutflow + totalExpenses);
 
-  // Periyodik Müşteriler (Radar)
   const periodicCustomers = customerList.filter((c: any) => c.period && c.period !== 'Yok');
 
   const dashboardCards = [
@@ -222,9 +315,216 @@ export default function AsistanMasterCRM() {
     },
   ];
 
+  if (!isLoaded) {
+    return null;
+  }
+
+  // --- EĞER GİRİŞ YAPILMAMIŞSA KİLİT EKRANINI GÖSTER ---
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-[#0f172a] to-teal-950 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 space-y-6 border border-slate-100 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-teal-500 via-cyan-500 to-amber-500" />
+          
+          <div className="text-center space-y-2 pt-2">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white text-3xl shadow-lg mb-2">
+              ✨
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">
+              as<span className="text-teal-600">i</span>stan <span className="font-light text-slate-700">temizlik</span>
+            </h1>
+            <p className="text-xs font-medium text-slate-400">
+              Yönetici Kontrol Paneli • Güvenli Giriş
+            </p>
+          </div>
+
+          {loginError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl text-xs font-bold text-center">
+              ⚠️ {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                KULLANICI ADI (TELEFON NO)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-3 text-slate-400 text-sm">📱</span>
+                <input
+                  type="text"
+                  placeholder="5010862000"
+                  value={loginPhone}
+                  onChange={(e) => setLoginPhone(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  required
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 mt-1 block">Başında sıfır olmadan giriniz (Örn: 5010862000)</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                ŞİFRE
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-3 text-slate-400 text-sm">🔒</span>
+                <input
+                  type="password"
+                  placeholder="••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-black text-sm shadow-lg shadow-teal-600/25 transition-all cursor-pointer"
+            >
+              Sisteme Giriş Yap →
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setIsForgotModalOpen(true)}
+              className="text-teal-700 hover:text-teal-900 hover:underline cursor-pointer"
+            >
+              Şifremi Unuttum?
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPassMessage({ type: '', text: '' });
+                setIsChangePassModalOpen(true);
+              }}
+              className="text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
+            >
+              🔑 Şifremi Değiştir
+            </button>
+          </div>
+        </div>
+
+        {/* ŞİFREMİ UNUTTUM MODALI */}
+        {isForgotModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-base font-black text-slate-900">📲 Şifreyi Telefona Gönder</h3>
+                <button onClick={() => setIsForgotModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">✕</button>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Sistemde kayıtlı olan <b>0501 086 20 00</b> numaralı cep telefonunuza son kullandığınız güncel şifreyi göndermek için gönderim yöntemini seçin:
+              </p>
+              <div className="space-y-2.5 pt-2">
+                <button
+                  onClick={() => handleSendPasswordToPhone('whatsapp')}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>💬</span> WhatsApp ile Cep Telefonuma Gönder
+                </button>
+                <button
+                  onClick={() => handleSendPasswordToPhone('sms')}
+                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>📩</span> SMS Mesajı Olarak Gönder
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ŞİFRE DEĞİŞTİRME MODALI (GİRİŞ EKRANINDA) */}
+        {isChangePassModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 className="text-base font-black text-slate-900">🔑 Şifremi Değiştir</h3>
+                <button onClick={() => setIsChangePassModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">✕</button>
+              </div>
+
+              {passMessage.text && (
+                <div className={`p-3 rounded-xl text-xs font-bold text-center ${passMessage.type === 'error' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                  {passMessage.text}
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Mevcut (Eski) Şifreniz *</label>
+                  <input
+                    type="password"
+                    value={oldPassInput}
+                    onChange={(e) => setOldPassInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Yeni Şifre *</label>
+                  <input
+                    type="password"
+                    value={newPassInput}
+                    onChange={(e) => setNewPassInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">Yeni Şifre (Tekrar) *</label>
+                  <input
+                    type="password"
+                    value={newPassConfirm}
+                    onChange={(e) => setNewPassConfirm(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setIsChangePassModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">İptal</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl bg-teal-600 text-white text-xs font-extrabold">Şifreyi Güncelle</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans relative">
       
+      {/* ÜST GÜVENLİK & OTURUM ÇUBUĞU */}
+      <div className="bg-slate-900 text-slate-300 px-6 py-2 text-xs flex justify-between items-center border-b border-slate-800">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="font-bold text-white">Yönetici Oturumu Aktif</span>
+          <span className="text-slate-400 hidden sm:inline">({ADMIN_PHONE})</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setPassMessage({ type: '', text: '' });
+              setIsChangePassModalOpen(true);
+            }}
+            className="text-slate-300 hover:text-white font-bold flex items-center gap-1 bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded-lg transition-all cursor-pointer"
+          >
+            🔑 Şifre Değiştir
+          </button>
+          <button
+            onClick={handleLogout}
+            className="text-rose-300 hover:text-white font-bold flex items-center gap-1 bg-rose-950/60 hover:bg-rose-600 px-3 py-1 rounded-lg border border-rose-800/50 transition-all cursor-pointer"
+          >
+            🚪 Güvenli Çıkış
+          </button>
+        </div>
+      </div>
+
       <Header 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -241,7 +541,6 @@ export default function AsistanMasterCRM() {
         {activeTab === 'home' && (
           <div className="space-y-6 py-2">
             
-            {/* PERİYODİK MÜŞTERİ RADARI BİLDİRİM KUTUSU */}
             {periodicCustomers.length > 0 && (
               <div className="bg-gradient-to-r from-purple-900 via-purple-800 to-indigo-900 text-white p-6 rounded-3xl shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="space-y-1">
@@ -310,7 +609,6 @@ export default function AsistanMasterCRM() {
           </div>
         )}
 
-        {/* KASA & FİNANS İKİ SATIRLI ÖZEL GÖSTERGE PANELİ */}
         {activeTab === 'finance' && (
           <div className="space-y-6 bg-slate-50/50 p-6 rounded-3xl border border-slate-200/80">
             
@@ -339,7 +637,6 @@ export default function AsistanMasterCRM() {
               </div>
             </div>
 
-            {/* 1. SATIR: DEVAM EDEN İŞLER */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-amber-500"></span>
@@ -369,7 +666,6 @@ export default function AsistanMasterCRM() {
               </div>
             </div>
 
-            {/* 2. SATIR: TESLİM EDİLEN İŞLER & KASA */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -419,8 +715,6 @@ export default function AsistanMasterCRM() {
           />
         )}
 
-        {activeTab === 'finance' && null}
-
         {activeTab === 'orders' && (
           <OrdersModule 
             ordersList={ordersList}
@@ -452,6 +746,61 @@ export default function AsistanMasterCRM() {
         )}
 
       </main>
+
+      {/* ŞİFRE DEĞİŞTİRME MODALI (OTURUM AÇIKKEN) */}
+      {isChangePassModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="text-base font-black text-slate-900">🔑 Şifremi Değiştir</h3>
+              <button onClick={() => setIsChangePassModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">✕</button>
+            </div>
+
+            {passMessage.text && (
+              <div className={`p-3 rounded-xl text-xs font-bold text-center ${passMessage.type === 'error' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                {passMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Mevcut (Eski) Şifreniz *</label>
+                <input
+                  type="password"
+                  value={oldPassInput}
+                  onChange={(e) => setOldPassInput(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Yeni Şifre *</label>
+                <input
+                  type="password"
+                  value={newPassInput}
+                  onChange={(e) => setNewPassInput(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Yeni Şifre (Tekrar) *</label>
+                <input
+                  type="password"
+                  value={newPassConfirm}
+                  onChange={(e) => setNewPassConfirm(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsChangePassModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">İptal</button>
+                <button type="submit" className="px-5 py-2 rounded-xl bg-teal-600 text-white text-xs font-extrabold">Şifreyi Güncelle</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* WHATSAPP KONUM GÖNDER MODALI */}
       {isLocationModalOpen && (
