@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header, { TabType } from './components/Header';
 import PriceListModule from './components/PriceListModule';
 import StaffAndCustomerModule from './components/StaffAndCustomerModule';
@@ -16,6 +16,10 @@ import {
   Expense, 
   Order 
 } from './components/types';
+
+// --- SUPABASE BAĞLANTI BİLGİLERİ ---
+const SUPABASE_URL = 'https://vrabimargfpbtndvpvlr.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_-dMC_XVmM0qtGBKyHsYZwA_FRitYPh2';
 
 export default function AsistanMasterCRM() {
   // --- GÜVENLİK VE GİRİŞ (AUTH) STATE'LERİ ---
@@ -37,10 +41,11 @@ export default function AsistanMasterCRM() {
   const [forgotPhoneInput, setForgotPhoneInput] = useState('');
   const [forgotError, setForgotError] = useState('');
 
-  // --- CRM UYGULAMA STATE'LERİ ---
+  // --- CRM UYGULAMA & BULUT STATE'LERİ ---
   const [activeTab, setActiveTab] = useState<TabType>('home');
   const [dateFilter, setDateFilter] = useState<'today' | 'monthly' | 'custom'>('monthly');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [locationPhone, setLocationPhone] = useState('');
@@ -74,46 +79,123 @@ export default function AsistanMasterCRM() {
     }
   });
 
-  // Verileri ve Şifreyi Yükle
-  useEffect(() => {
+  // --- SUPABASE BULUTTAN VERİ ÇEKME FONKSİYONU ---
+  const fetchFromSupabase = useCallback(async () => {
     try {
-      const storedPass = localStorage.getItem('asistan_admin_pass_v1');
-      if (storedPass) {
-        setSavedPassword(storedPass);
-      } else {
-        localStorage.setItem('asistan_admin_pass_v1', '123456');
+      setSyncStatus('syncing');
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistan_crm_store?id=eq.main_store&select=data`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store'
+      });
+
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0 && rows[0].data) {
+          const cloud = rows[0].data;
+          if (cloud.priceCategories) setPriceCategories(cloud.priceCategories);
+          if (cloud.staffList) setStaffList(cloud.staffList);
+          if (cloud.customerList) setCustomerList(cloud.customerList);
+          if (cloud.ordersList) setOrdersList(cloud.ordersList);
+          if (cloud.expenses) setExpenses(cloud.expenses);
+          if (cloud.transactions) setTransactions(cloud.transactions);
+          if (cloud.calendarData) setCalendarData(cloud.calendarData);
+          if (cloud.savedPassword) {
+            setSavedPassword(cloud.savedPassword);
+            localStorage.setItem('asistan_admin_pass_v1', cloud.savedPassword);
+          }
+          setSyncStatus('synced');
+          return true;
+        }
       }
-
-      const authSession = sessionStorage.getItem('asistan_auth_session');
-      if (authSession === 'active') {
-        setIsAuthenticated(true);
-      }
-
-      const savedPrices = localStorage.getItem('asistan_prices_v1');
-      const savedStaff = localStorage.getItem('asistan_staff_v1');
-      const savedCustomers = localStorage.getItem('asistan_customers_v1');
-      const savedOrders = localStorage.getItem('asistan_orders_v1');
-      const savedExpenses = localStorage.getItem('asistan_expenses_v1');
-      const savedTransactions = localStorage.getItem('asistan_transactions_v1');
-      const savedCalendar = localStorage.getItem('asistan_calendar_v1');
-
-      if (savedPrices) setPriceCategories(JSON.parse(savedPrices));
-      if (savedStaff) setStaffList(JSON.parse(savedStaff));
-      if (savedCustomers) setCustomerList(JSON.parse(savedCustomers));
-      if (savedOrders) setOrdersList(JSON.parse(savedOrders));
-      if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
-      if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
-      if (savedCalendar) setCalendarData(JSON.parse(savedCalendar));
+      setSyncStatus('idle');
+      return false;
     } catch (err) {
-      console.error('Veriler yüklenirken hata:', err);
-    } finally {
-      setIsLoaded(true);
+      console.error('Supabase veri çekme hatası:', err);
+      setSyncStatus('error');
+      return false;
     }
   }, []);
 
-  // Verileri Kaydet
+  // --- SUPABASE BULUTA VERİ KAYDETME FONKSİYONU ---
+  const saveToSupabase = useCallback(async (payload: any) => {
+    try {
+      setSyncStatus('syncing');
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/asistan_crm_store`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          id: 'main_store',
+          data: payload,
+          updated_at: new Date().toISOString()
+        })
+      });
+
+      if (res.ok) {
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (err) {
+      console.error('Supabase kayıt hatası:', err);
+      setSyncStatus('error');
+    }
+  }, []);
+
+  // İlk Açılışta Önce Yerel Hafızayı, Sonra Bulutu Yükle
+  useEffect(() => {
+    const initData = async () => {
+      try {
+        const authSession = sessionStorage.getItem('asistan_auth_session');
+        if (authSession === 'active') {
+          setIsAuthenticated(true);
+        }
+
+        // 1. Önce yerel verileri yükle (hızlı açılış ve yedek için)
+        const storedPass = localStorage.getItem('asistan_admin_pass_v1');
+        if (storedPass) setSavedPassword(storedPass);
+
+        const savedPrices = localStorage.getItem('asistan_prices_v1');
+        const savedStaff = localStorage.getItem('asistan_staff_v1');
+        const savedCustomers = localStorage.getItem('asistan_customers_v1');
+        const savedOrders = localStorage.getItem('asistan_orders_v1');
+        const savedExpenses = localStorage.getItem('asistan_expenses_v1');
+        const savedTransactions = localStorage.getItem('asistan_transactions_v1');
+        const savedCalendar = localStorage.getItem('asistan_calendar_v1');
+
+        if (savedPrices) setPriceCategories(JSON.parse(savedPrices));
+        if (savedStaff) setStaffList(JSON.parse(savedStaff));
+        if (savedCustomers) setCustomerList(JSON.parse(savedCustomers));
+        if (savedOrders) setOrdersList(JSON.parse(savedOrders));
+        if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+        if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
+        if (savedCalendar) setCalendarData(JSON.parse(savedCalendar));
+
+        // 2. Supabase Bulutta kayıt varsa onu çek ve üstüne yaz
+        await fetchFromSupabase();
+      } catch (err) {
+        console.error('Veriler yüklenirken hata:', err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+
+    initData();
+  }, [fetchFromSupabase]);
+
+  // Veriler Değiştiğinde Hem LocalStorage'a Hem Supabase Buluta Kaydet
   useEffect(() => {
     if (!isLoaded) return;
+
     localStorage.setItem('asistan_prices_v1', JSON.stringify(priceCategories));
     localStorage.setItem('asistan_staff_v1', JSON.stringify(staffList));
     localStorage.setItem('asistan_customers_v1', JSON.stringify(customerList));
@@ -121,7 +203,23 @@ export default function AsistanMasterCRM() {
     localStorage.setItem('asistan_expenses_v1', JSON.stringify(expenses));
     localStorage.setItem('asistan_transactions_v1', JSON.stringify(transactions));
     localStorage.setItem('asistan_calendar_v1', JSON.stringify(calendarData));
-  }, [priceCategories, staffList, customerList, ordersList, expenses, transactions, calendarData, isLoaded]);
+    localStorage.setItem('asistan_admin_pass_v1', savedPassword);
+
+    const timer = setTimeout(() => {
+      saveToSupabase({
+        priceCategories,
+        staffList,
+        customerList,
+        ordersList,
+        expenses,
+        transactions,
+        calendarData,
+        savedPassword
+      });
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [priceCategories, staffList, customerList, ordersList, expenses, transactions, calendarData, savedPassword, isLoaded, saveToSupabase]);
 
   // --- GİRİŞ / ÇIKIŞ / ŞİFRE FONKSİYONLARI ---
   const handleLogin = (e: React.FormEvent) => {
@@ -134,6 +232,7 @@ export default function AsistanMasterCRM() {
       setLoginError('');
       setLoginPhone('');
       setLoginPassword('');
+      fetchFromSupabase();
     } else {
       setLoginError('Kullanıcı adı veya şifre hatalı!');
     }
@@ -163,7 +262,7 @@ export default function AsistanMasterCRM() {
 
     setSavedPassword(newPassInput);
     localStorage.setItem('asistan_admin_pass_v1', newPassInput);
-    setPassMessage({ type: 'success', text: 'Şifreniz başarıyla güncellendi!' });
+    setPassMessage({ type: 'success', text: 'Şifreniz hem cihazda hem bulutta güncellendi!' });
     setOldPassInput('');
     setNewPassInput('');
     setNewPassConfirm('');
@@ -533,12 +632,45 @@ export default function AsistanMasterCRM() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans relative">
       
-      {/* ÜST GÜVENLİK & OTURUM ÇUBUĞU */}
-      <div className="bg-slate-900 text-slate-300 px-6 py-2 text-xs flex justify-between items-center border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-bold text-white">Yönetici Oturumu Aktif</span>
+      {/* ÜST GÜVENLİK & BULUT SENKRONİZASYON ÇUBUĞU */}
+      <div className="bg-slate-900 text-slate-300 px-6 py-2 text-xs flex flex-wrap justify-between items-center border-b border-slate-800 gap-2">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="font-bold text-white">Yönetici Oturumu Aktif</span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-800/90 px-3 py-1 rounded-full border border-slate-700">
+            {syncStatus === 'syncing' && (
+              <span className="text-amber-400 font-bold flex items-center gap-1">
+                ⏳ Buluta Kaydediliyor...
+              </span>
+            )}
+            {syncStatus === 'synced' && (
+              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                ☁️ Supabase Bulut Aktif
+              </span>
+            )}
+            {syncStatus === 'error' && (
+              <span className="text-rose-400 font-bold flex items-center gap-1">
+                ⚠️ Bulut Bağlantı Uyarısı (SQL Tablosunu Kontrol Edin)
+              </span>
+            )}
+            {syncStatus === 'idle' && (
+              <span className="text-slate-400 font-bold flex items-center gap-1">
+                ☁️ Bulut Hazır
+              </span>
+            )}
+            <button
+              onClick={fetchFromSupabase}
+              title="Buluttaki son verileri şimdi çek"
+              className="text-[11px] text-teal-300 hover:text-white underline ml-1 cursor-pointer"
+            >
+              🔄 Eşitle
+            </button>
+          </div>
         </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
