@@ -32,7 +32,10 @@ export default function AsistanMasterCRM() {
   const [newPassInput, setNewPassInput] = useState('');
   const [newPassConfirm, setNewPassConfirm] = useState('');
   const [passMessage, setPassMessage] = useState({ type: '', text: '' });
+  
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotPhoneInput, setForgotPhoneInput] = useState('');
+  const [forgotError, setForgotError] = useState('');
 
   // --- CRM UYGULAMA STATE'LERİ ---
   const [activeTab, setActiveTab] = useState<TabType>('home');
@@ -129,9 +132,10 @@ export default function AsistanMasterCRM() {
       setIsAuthenticated(true);
       sessionStorage.setItem('asistan_auth_session', 'active');
       setLoginError('');
+      setLoginPhone('');
       setLoginPassword('');
     } else {
-      setLoginError('Kullanıcı adı (Telefon) veya şifre hatalı!');
+      setLoginError('Kullanıcı adı veya şifre hatalı!');
     }
   };
 
@@ -171,6 +175,12 @@ export default function AsistanMasterCRM() {
   };
 
   const handleSendPasswordToPhone = (method: 'whatsapp' | 'sms') => {
+    const cleanForgot = forgotPhoneInput.replace(/\D/g, '').replace(/^0/, '');
+    if (cleanForgot !== ADMIN_PHONE) {
+      setForgotError('Girdiğiniz telefon numarası sistem yöneticisi ile eşleşmiyor!');
+      return;
+    }
+
     const message = `🔐 *ASİSTAN TEMİZLİK CRM*\n\nSistem giriş bilgileriniz aşağıdadır:\n👤 *Kullanıcı Adı:* ${ADMIN_PHONE}\n🔑 *Son Kullandığınız Şifre:* ${savedPassword}\n\n_Güvenliğiniz için mesajı okuduktan sonra silebilirsiniz._`;
     
     if (method === 'whatsapp') {
@@ -181,6 +191,8 @@ export default function AsistanMasterCRM() {
       window.location.href = smsUrl;
     }
     setIsForgotModalOpen(false);
+    setForgotPhoneInput('');
+    setForgotError('');
   };
 
   const totalPricesCount = priceCategories.reduce((acc, cat) => acc + cat.items.length, 0);
@@ -344,23 +356,23 @@ export default function AsistanMasterCRM() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
             <div>
               <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
-                KULLANICI ADI (TELEFON NO)
+                KULLANICI ADI
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-3 text-slate-400 text-sm">📱</span>
+                <span className="absolute left-3.5 top-3 text-slate-400 text-sm">👤</span>
                 <input
                   type="text"
-                  placeholder="5010862000"
+                  name="crm_user_input_field"
+                  autoComplete="off"
                   value={loginPhone}
                   onChange={(e) => setLoginPhone(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition-all"
                   required
                 />
               </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">Başında sıfır olmadan giriniz (Örn: 5010862000)</span>
             </div>
 
             <div>
@@ -371,7 +383,8 @@ export default function AsistanMasterCRM() {
                 <span className="absolute left-3.5 top-3 text-slate-400 text-sm">🔒</span>
                 <input
                   type="password"
-                  placeholder="••••••"
+                  name="crm_pass_input_field"
+                  autoComplete="new-password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 transition-all"
@@ -391,7 +404,11 @@ export default function AsistanMasterCRM() {
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold">
             <button
               type="button"
-              onClick={() => setIsForgotModalOpen(true)}
+              onClick={() => {
+                setForgotError('');
+                setForgotPhoneInput('');
+                setIsForgotModalOpen(true);
+              }}
               className="text-teal-700 hover:text-teal-900 hover:underline cursor-pointer"
             >
               Şifremi Unuttum?
@@ -418,9 +435,26 @@ export default function AsistanMasterCRM() {
                 <button onClick={() => setIsForgotModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold">✕</button>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Sistemde kayıtlı olan <b>0501 086 20 00</b> numaralı cep telefonunuza son kullandığınız güncel şifreyi göndermek için gönderim yöntemini seçin:
+                Güvenlik doğrulaması için lütfen sistemde kayıtlı olan yönetici telefon numaranızı giriniz:
               </p>
-              <div className="space-y-2.5 pt-2">
+
+              {forgotError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold text-center">
+                  {forgotError}
+                </div>
+              )}
+
+              <div>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={forgotPhoneInput}
+                  onChange={(e) => setForgotPhoneInput(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold outline-none focus:border-teal-600"
+                />
+              </div>
+
+              <div className="space-y-2.5 pt-1">
                 <button
                   onClick={() => handleSendPasswordToPhone('whatsapp')}
                   className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-2 cursor-pointer"
@@ -504,7 +538,6 @@ export default function AsistanMasterCRM() {
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="font-bold text-white">Yönetici Oturumu Aktif</span>
-          <span className="text-slate-400 hidden sm:inline">({ADMIN_PHONE})</span>
         </div>
         <div className="flex items-center gap-3">
           <button
