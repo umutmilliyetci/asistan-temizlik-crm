@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { StaffMember, Customer, Order } from './types';
 
-interface StaffAndCustomerModuleProps {
+interface Props {
   mode: 'staff' | 'customers';
   staffList: StaffMember[];
   setStaffList: React.Dispatch<React.SetStateAction<StaffMember[]>>;
@@ -18,404 +18,590 @@ export default function StaffAndCustomerModule({
   setStaffList,
   customerList,
   setCustomerList,
-  ordersList = [],
-}: StaffAndCustomerModuleProps) {
+  ordersList = []
+}: Props) {
+  // --- PERSONEL STATE'LERİ ---
   const [staffName, setStaffName] = useState('');
-  const [staffRole, setStaffRole] = useState('Saha Temizlik Personeli');
+  const [staffRole, setStaffRole] = useState('Saha Personeli (Ev Temizliği)');
   const [staffPhone, setStaffPhone] = useState('');
+  const [staffDailyWage, setStaffDailyWage] = useState('');
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
 
+  // --- MÜŞTERİ STATE'LERİ ---
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [custAddress, setCustAddress] = useState('');
+  const [custServiceArea, setCustServiceArea] = useState('Ev Temizliği');
+  const [custPeriod, setCustPeriod] = useState('Yok');
+  const [custContactMethod, setCustContactMethod] = useState('Telefon');
   const [custNotes, setCustNotes] = useState('');
-  const [custPeriod, setCustPeriod] = useState<'Yok' | 'Haftalık' | '15 Günde Bir' | 'Aylık'>('Yok');
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
 
-  const [staffPayments, setStaffPayments] = useState<{ [staffName: string]: number }>({});
-  const [paymentModalStaff, setPaymentModalStaff] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState<string>('');
+  // --- ARAMA STATE'İ ---
+  const [customerSearch, setCustomerSearch] = useState('');
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  // --- PERSONEL EKLE / GÜNCELLE ---
+  const handleAddOrUpdateStaff = (e: React.FormEvent) => {
     e.preventDefault();
     if (!staffName.trim()) return;
-    const newStaff: StaffMember = {
-      id: `STF-${Date.now()}`,
-      name: staffName.trim(),
-      role: staffRole,
-      phone: staffPhone.trim(),
-    };
-    setStaffList([...staffList, newStaff]);
+
+    if (editingStaffId) {
+      setStaffList(prev =>
+        prev.map(s =>
+          s.id === editingStaffId
+            ? {
+                ...s,
+                name: staffName.trim(),
+                role: staffRole,
+                phone: staffPhone.trim(),
+                dailyWage: Number(staffDailyWage) || 0
+              }
+            : s
+        )
+      );
+      setEditingStaffId(null);
+    } else {
+      const newStaff: StaffMember = {
+        id: Date.now().toString(),
+        name: staffName.trim(),
+        role: staffRole,
+        phone: staffPhone.trim(),
+        dailyWage: Number(staffDailyWage) || 0,
+        status: 'Aktif'
+      };
+      setStaffList(prev => [newStaff, ...prev]);
+    }
+
     setStaffName('');
     setStaffPhone('');
+    setStaffDailyWage('');
+    setStaffRole('Saha Personeli (Ev Temizliği)');
+  };
+
+  const handleEditStaffClick = (staff: StaffMember) => {
+    setEditingStaffId(staff.id);
+    setStaffName(staff.name);
+    setStaffRole(staff.role || 'Saha Personeli (Ev Temizliği)');
+    setStaffPhone(staff.phone || '');
+    setStaffDailyWage(staff.dailyWage ? String(staff.dailyWage) : '');
   };
 
   const handleDeleteStaff = (id: string) => {
-    setStaffList(staffList.filter((s) => s.id !== id));
+    if (confirm('Bu personeli silmek istediğinize emin misiniz?')) {
+      setStaffList(prev => prev.filter(s => s.id !== id));
+    }
   };
 
-  const handleAddCustomer = (e: React.FormEvent) => {
+  // --- MÜŞTERİ EKLE / GÜNCELLE ---
+  const handleAddOrUpdateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
     if (!custName.trim()) return;
-    const newCust: Customer = {
-      id: `CUST-${Date.now()}`,
-      name: custName.trim(),
-      phone: custPhone.trim(),
-      address: custAddress.trim(),
-      notes: custNotes.trim(),
-      period: custPeriod,
-      lastOrderDate: new Date().toLocaleDateString('tr-TR'),
-    };
-    setCustomerList([...customerList, newCust]);
+
+    if (editingCustomerId) {
+      setCustomerList(prev =>
+        prev.map((c: any) =>
+          c.id === editingCustomerId
+            ? {
+                ...c,
+                name: custName.trim(),
+                phone: custPhone.trim(),
+                address: custAddress.trim(),
+                serviceArea: custServiceArea,
+                period: custPeriod,
+                contactMethod: custContactMethod,
+                notes: custNotes.trim()
+              }
+            : c
+        )
+      );
+      setEditingCustomerId(null);
+    } else {
+      const newCustomer: any = {
+        id: Date.now().toString(),
+        name: custName.trim(),
+        phone: custPhone.trim(),
+        address: custAddress.trim(),
+        serviceArea: custServiceArea,
+        period: custPeriod,
+        contactMethod: custContactMethod,
+        notes: custNotes.trim(),
+        createdAt: new Date().toLocaleDateString('tr-TR')
+      };
+      setCustomerList(prev => [newCustomer, ...prev]);
+    }
+
     setCustName('');
     setCustPhone('');
     setCustAddress('');
-    setCustNotes('');
+    setCustServiceArea('Ev Temizliği');
     setCustPeriod('Yok');
+    setCustContactMethod('Telefon');
+    setCustNotes('');
+  };
+
+  const handleEditCustomerClick = (cust: any) => {
+    setEditingCustomerId(cust.id);
+    setCustName(cust.name || '');
+    setCustPhone(cust.phone || '');
+    setCustAddress(cust.address || '');
+    setCustServiceArea(cust.serviceArea || 'Ev Temizliği');
+    setCustPeriod(cust.period || 'Yok');
+    setCustContactMethod(cust.contactMethod || 'Telefon');
+    setCustNotes(cust.notes || '');
+  };
+
+  const handleCancelCustomerEdit = () => {
+    setEditingCustomerId(null);
+    setCustName('');
+    setCustPhone('');
+    setCustAddress('');
+    setCustServiceArea('Ev Temizliği');
+    setCustPeriod('Yok');
+    setCustContactMethod('Telefon');
+    setCustNotes('');
   };
 
   const handleDeleteCustomer = (id: string) => {
-    setCustomerList(customerList.filter((c) => c.id !== id));
+    if (confirm('Bu müşteri kaydını silmek istediğinize emin misiniz?')) {
+      setCustomerList(prev => prev.filter(c => c.id !== id));
+    }
   };
 
-  const handleRecordPayment = (staffName: string) => {
-    const amt = Number(paymentAmount) || 0;
-    if (amt <= 0) return;
-    const currentPaid = staffPayments[staffName] || 0;
-    setStaffPayments({
-      ...staffPayments,
-      [staffName]: currentPaid + amt,
-    });
-    setPaymentModalStaff(null);
-    setPaymentAmount('');
-  };
+  // --- MÜŞTERİ ARAMA FİLTRESİ ---
+  const filteredCustomers = customerList.filter((c: any) => {
+    if (!customerSearch.trim()) return true;
+    const q = customerSearch.toLocaleLowerCase('tr-TR');
+    return (
+      (c.name && c.name.toLocaleLowerCase('tr-TR').includes(q)) ||
+      (c.phone && c.phone.toLocaleLowerCase('tr-TR').includes(q)) ||
+      (c.address && c.address.toLocaleLowerCase('tr-TR').includes(q)) ||
+      (c.serviceArea && c.serviceArea.toLocaleLowerCase('tr-TR').includes(q)) ||
+      (c.contactMethod && c.contactMethod.toLocaleLowerCase('tr-TR').includes(q)) ||
+      (c.notes && c.notes.toLocaleLowerCase('tr-TR').includes(q))
+    );
+  });
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      
-      {/* SOL: EKLEME FORMU */}
-      <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-4">
-        {mode === 'staff' ? (
-          <>
-            <div className="border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                İK & Saha Ekibi
-              </span>
-              <h2 className="text-base font-black text-slate-900 mt-2">Yeni Personel Ekle</h2>
-              <p className="text-xs text-slate-500">Saha takviminde ve iş emirlerinde görevlendirilecek personeller.</p>
+  // --- PERSONEL EKRANI ---
+  if (mode === 'staff') {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-4">
+          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+            <span className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg font-bold">
+              👥
+            </span>
+            <div>
+              <h2 className="text-base font-black text-slate-900">
+                {editingStaffId ? 'Personel Bilgilerini Güncelle' : 'Yeni Personel Ekle'}
+              </h2>
+              <p className="text-xs text-slate-500">Saha ve atölye ekibinizi tanımlayın</p>
             </div>
+          </div>
 
-            <form onSubmit={handleAddStaff} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Personel Adı Soyadı *</label>
-                <input
-                  type="text"
-                  placeholder="Örn: Ayşe Hanım"
-                  value={staffName}
-                  onChange={(e) => setStaffName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Görevi / Rolü</label>
-                <select
-                  value={staffRole}
-                  onChange={(e) => setStaffRole(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-white"
-                >
-                  <option>Saha Temizlik Personeli</option>
-                  <option>Atölye / Ütü Uzmanı</option>
-                  <option>Fason Halı Yıkama Atölyesi</option>
-                  <option>Fason Kuru Temizleme</option>
-                  <option>Genel Koordinatör</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Telefon Numarası</label>
-                <input
-                  type="text"
-                  placeholder="05XX..."
-                  value={staffPhone}
-                  onChange={(e) => setStaffPhone(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-teal-600"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-sm transition-all"
-              >
-                + Personeli Kaydet
-              </button>
-            </form>
-          </>
-        ) : (
-          <>
-            <div className="border-b border-slate-100 pb-3">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                CRM Veritabanı & Abone Takibi
-              </span>
-              <h2 className="text-base font-black text-slate-900 mt-2">Yeni Müşteri Ekle</h2>
-              <p className="text-xs text-slate-500">Kayıtlı müşteri rehberiniz ve periyodik tekrar sıklığı.</p>
-            </div>
-
-            <form onSubmit={handleAddCustomer} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Müşteri Adı Soyadı *</label>
-                <input
-                  type="text"
-                  placeholder="Örn: Belgin Hanım"
-                  value={custName}
-                  onChange={(e) => setCustName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-purple-600"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Telefon</label>
-                <input
-                  type="text"
-                  placeholder="05XX..."
-                  value={custPhone}
-                  onChange={(e) => setCustPhone(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-purple-600"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Adres / Bölge</label>
-                <input
-                  type="text"
-                  placeholder="Nilüfer, Özlüce..."
-                  value={custAddress}
-                  onChange={(e) => setCustAddress(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:border-purple-600"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Periyodik Tekrar Sıklığı (Radar)</label>
-                <select
-                  value={custPeriod}
-                  onChange={(e: any) => setCustPeriod(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none bg-white cursor-pointer"
-                >
-                  <option value="Yok">Tek seferlik (Periyotsuz)</option>
-                  <option value="Haftalık">🔄 Haftalık Abone</option>
-                  <option value="15 Günde Bir">🔄 15 Günde Bir</option>
-                  <option value="Aylık">🔄 Aylık Düzenli</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-700">Notlar / Tercihler</label>
-                <textarea
-                  rows={2}
-                  placeholder="Özel istekler..."
-                  value={custNotes}
-                  onChange={(e) => setCustNotes(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none resize-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black uppercase tracking-wider shadow-sm transition-all"
-              >
-                + Müşteriyi Kaydet
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-
-      {/* SAĞ: LİSTE */}
-      <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-        <div className="border-b border-slate-100 pb-4">
-          <h2 className="text-base font-black text-slate-900">
-            {mode === 'staff' ? '👥 Personel & Fason Hakediş Cüzdanı' : '🤝 Kayıtlı Müşteri Listesi & Periyodik Radar'}
-          </h2>
-          <p className="text-xs text-slate-500">
-            {mode === 'staff'
-              ? 'Personellerin tamamladığı işler üzerinden hak edişleri ve kalan alacak bakiyeleri.'
-              : 'Sistemde kayıtlı tüm müşterileriniz ve periyodik abonelik durumları.'}
-          </p>
-        </div>
-
-        {mode === 'staff' ? (
-          staffList.length === 0 ? (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
-              <span className="text-3xl">👥</span>
-              <p className="text-sm font-bold text-slate-700">Henüz personel eklemediniz.</p>
-              <p className="text-xs text-slate-400">Soldaki formdan saha ve atölye personellerinizi ekleyebilirsiniz.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {staffList.map((staff) => {
-                const staffOrders = ordersList.filter(
-                  (o: any) => o.assignedStaff?.toLowerCase() === staff.name.toLowerCase() && o.orderStatus !== 'İptal'
-                );
-                const totalJobsDone = staffOrders.length;
-                
-                const totalEarned = staffOrders.reduce((acc, o: any) => {
-                  if (o.staffPayment !== undefined && o.staffPayment !== '') return acc + Number(o.staffPayment);
-                  const revenue = Number(o.price || o.totalAmount || 0);
-                  return acc + Math.round(revenue * (3000 / 3500));
-                }, 0);
-
-                const totalPaid = staffPayments[staff.name] || 0;
-                const remainingBalance = totalEarned - totalPaid;
-
-                return (
-                  <div
-                    key={staff.id || staff.name}
-                    className="p-5 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-4 hover:border-emerald-300 transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-base font-black text-slate-900">{staff.name}</h4>
-                          <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {staff.role}
-                          </span>
-                        </div>
-                        {staff.phone && <p className="text-xs text-slate-400 mt-0.5">📞 {staff.phone}</p>}
-                      </div>
-
-                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                        <button
-                          onClick={() => setPaymentModalStaff(staff.name)}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm flex items-center gap-1.5 transition-all"
-                        >
-                          <span>💸</span> Ödeme / Avans Yap
-                        </button>
-                        <button
-                          onClick={() => handleDeleteStaff(staff.id || '')}
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-xs font-bold transition-all"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
-                      <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Tamamlanan İş</span>
-                        <span className="text-xl font-black text-slate-800 mt-0.5 block">{totalJobsDone} Adet</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Hak Edilen Toplam</span>
-                        <span className="text-xl font-black text-emerald-700 mt-0.5 block">{totalEarned.toLocaleString('tr-TR')} ₺</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Ödenen / Avans</span>
-                        <span className="text-xl font-black text-amber-600 mt-0.5 block">{totalPaid.toLocaleString('tr-TR')} ₺</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase block">Kalan Alacak (Bakiye)</span>
-                        <span className={`text-xl font-black mt-0.5 block ${remainingBalance > 0 ? 'text-rose-600' : 'text-teal-700'}`}>
-                          {remainingBalance.toLocaleString('tr-TR')} ₺
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          customerList.length === 0 ? (
-            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
-              <span className="text-3xl">🤝</span>
-              <p className="text-sm font-bold text-slate-700">Henüz kayıtlı müşteri yok.</p>
-              <p className="text-xs text-slate-400">İş emri açtığınızda müşteriler otomatik buraya eklenir veya soldan ekleyebilirsiniz.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {customerList.map((customer) => (
-                <div
-                  key={customer.id || customer.name}
-                  className="p-4 rounded-2xl border border-slate-200 hover:border-purple-300 transition-all flex justify-between items-center bg-white shadow-2xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-black text-slate-900">{customer.name}</h4>
-                      {customer.period && customer.period !== 'Yok' && (
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                          🔄 {customer.period}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                      {customer.phone && <span>📞 {customer.phone}</span>}
-                      {customer.address && <span>📍 {customer.address}</span>}
-                    </div>
-                    {customer.notes && <p className="text-[11px] text-slate-400 italic">📝 {customer.notes}</p>}
-                  </div>
-
-                  <button
-                    onClick={() => handleDeleteCustomer(customer.id || '')}
-                    className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 text-xs font-bold transition-all"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-      </div>
-
-      {paymentModalStaff && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">Personel Ödemesi / Avans</h3>
-                <p className="text-xs text-emerald-700 font-bold">Personel: {paymentModalStaff}</p>
-              </div>
-              <button 
-                onClick={() => setPaymentModalStaff(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700">Ödenen Tutar (₺) *</label>
-              <input 
-                type="number"
-                placeholder="Örn: 5000"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-200 text-sm font-black text-emerald-700 outline-none focus:border-emerald-600"
-                autoFocus
+          <form onSubmit={handleAddOrUpdateStaff} className="space-y-3.5">
+            <div>
+              <label className="text-xs font-extrabold text-slate-700">Personel Adı Soyadı *</label>
+              <input
+                type="text"
+                placeholder="Örn: Ayşe Yılmaz"
+                value={staffName}
+                onChange={e => setStaffName(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-emerald-600"
+                required
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-              <button 
-                type="button" 
-                onClick={() => setPaymentModalStaff(null)}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200"
+            <div>
+              <label className="text-xs font-extrabold text-slate-700">Görev / Uzmanlık Alanı</label>
+              <select
+                value={staffRole}
+                onChange={e => setStaffRole(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 bg-white outline-none focus:border-emerald-600 cursor-pointer"
               >
-                Vazgeç
-              </button>
-              <button 
-                type="button" 
-                onClick={() => handleRecordPayment(paymentModalStaff)}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-sm"
+                <option value="Saha Personeli (Ev Temizliği)">Saha Personeli (Ev Temizliği)</option>
+                <option value="Ütü & Atölye Personeli">Ütü & Atölye Personeli</option>
+                <option value="Koltuk & Halı Yıkama Uzmanı">Koltuk & Halı Yıkama Uzmanı</option>
+                <option value="Kuru Temizleme & Leke Uzmanı">Kuru Temizleme & Leke Uzmanı</option>
+                <option value="Saha & Sevkiyat Sorumlusu">Saha & Sevkiyat Sorumlusu</option>
+                <option value="Fason Çözüm Ortağı">Fason Çözüm Ortağı</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-extrabold text-slate-700">Telefon Numarası</label>
+              <input
+                type="text"
+                placeholder="05XX XXX XX XX"
+                value={staffPhone}
+                onChange={e => setStaffPhone(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-emerald-600"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-extrabold text-slate-700">Varsayılan Günlük Yevmiye / Hakediş (₺)</label>
+              <input
+                type="number"
+                placeholder="Örn: 1500"
+                value={staffDailyWage}
+                onChange={e => setStaffDailyWage(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-emerald-600"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              {editingStaffId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStaffId(null);
+                    setStaffName('');
+                    setStaffPhone('');
+                    setStaffDailyWage('');
+                  }}
+                  className="w-1/3 py-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-extrabold hover:bg-slate-200 cursor-pointer"
+                >
+                  İptal
+                </button>
+              )}
+              <button
+                type="submit"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md transition-all cursor-pointer"
               >
-                Ödemeyi Kaydet
+                {editingStaffId ? '💾 Değişiklikleri Kaydet' : '+ Personeli Sisteme Ekle'}
               </button>
             </div>
+          </form>
+        </div>
+
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-base font-black text-slate-900">Kayıtlı Personel & Ekip Listesi</h3>
+              <p className="text-xs text-slate-500">Toplam {staffList.length} aktif personel kayıtlı</p>
+            </div>
+          </div>
+
+          {staffList.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-xs font-medium">
+              Henüz personel eklenmedi. Sol taraftaki formdan ilk personelinizi ekleyebilirsiniz.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {staffList.map(staff => (
+                <div
+                  key={staff.id}
+                  className="p-4 rounded-2xl border border-slate-200 hover:border-emerald-400 bg-slate-50/60 flex justify-between items-start gap-3 transition-all"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-sm text-slate-900">{staff.name}</span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        Aktif
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-bold">{staff.role}</p>
+                    {staff.phone && <p className="text-xs text-slate-500">📱 {staff.phone}</p>}
+                    {Boolean(staff.dailyWage) && (
+                      <p className="text-xs text-teal-700 font-extrabold">
+                        💰 Günlük Hakediş: {Number(staff.dailyWage).toLocaleString('tr-TR')} ₺
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleEditStaffClick(staff)}
+                      className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs cursor-pointer"
+                      title="Düzenle"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStaff(staff.id)}
+                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 text-xs cursor-pointer"
+                      title="Sil"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- MÜŞTERİ YÖNETİMİ (CRM) EKRANI ---
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* SOL TARAF: MÜŞTERİ KAYIT / DÜZENLEME FORMU */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-4">
+        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+          <span className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-lg font-bold">
+            🤝
+          </span>
+          <div>
+            <h2 className="text-base font-black text-slate-900">
+              {editingCustomerId ? 'Müşteri Kartını Güncelle' : 'Yeni Müşteri Kartı Aç'}
+            </h2>
+            <p className="text-xs text-slate-500">Hizmet, periyot ve iletişim kanalı ile kaydedin</p>
           </div>
         </div>
-      )}
 
+        <form onSubmit={handleAddOrUpdateCustomer} className="space-y-3.5">
+          <div>
+            <label className="text-xs font-extrabold text-slate-700">Müşteri Adı Soyadı / Firma *</label>
+            <input
+              type="text"
+              placeholder="Örn: Zeynep Yılmaz"
+              value={custName}
+              onChange={e => setCustName(e.target.value)}
+              className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-purple-600"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-extrabold text-slate-700">Telefon Numarası *</label>
+            <input
+              type="text"
+              placeholder="05XX XXX XX XX"
+              value={custPhone}
+              onChange={e => setCustPhone(e.target.value)}
+              className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-purple-600"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-extrabold text-slate-700">Açık Adres / Site / Blok</label>
+            <textarea
+              rows={2}
+              placeholder="Mahalle, site, blok, daire no..."
+              value={custAddress}
+              onChange={e => setCustAddress(e.target.value)}
+              className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-purple-600"
+            />
+          </div>
+
+          {/* 1. YENİ ALAN: GÖRÜŞÜLEN BÖLÜM (HİZMET ALANI) */}
+          <div>
+            <label className="text-xs font-extrabold text-teal-800 flex items-center gap-1">
+              <span>🧼</span> Görüşülen Bölüm (Hizmet Alanı)
+            </label>
+            <select
+              value={custServiceArea}
+              onChange={e => setCustServiceArea(e.target.value)}
+              className="w-full p-3 rounded-xl border border-teal-200 text-xs font-extrabold mt-1 bg-teal-50/50 text-slate-800 outline-none focus:border-teal-600 cursor-pointer"
+            >
+              <option value="Ev Temizliği">Ev Temizliği</option>
+              <option value="Ütü">Ütü</option>
+              <option value="Halı Yıkama">Halı Yıkama</option>
+              <option value="Koltuk Yıkama">Koltuk Yıkama</option>
+              <option value="Kuru Temizleme">Kuru Temizleme</option>
+            </select>
+          </div>
+
+          {/* 2. ALAN: PERİYODİK TEKRAR SIKLIĞI */}
+          <div>
+            <label className="text-xs font-extrabold text-purple-800 flex items-center gap-1">
+              <span>🔁</span> Periyodik Tekrar Sıklığı
+            </label>
+            <select
+              value={custPeriod}
+              onChange={e => setCustPeriod(e.target.value)}
+              className="w-full p-3 rounded-xl border border-purple-200 text-xs font-extrabold mt-1 bg-purple-50/40 text-slate-800 outline-none focus:border-purple-600 cursor-pointer"
+            >
+              <option value="Yok">Yok (Tek Seferlik / Standart)</option>
+              <option value="Haftalık">Haftalık Düzenli Müşteri</option>
+              <option value="15 Günlük">15 Günde Bir Düzenli</option>
+              <option value="Aylık">Ayda Bir Düzenli</option>
+            </select>
+          </div>
+
+          {/* 3. YENİ ALAN: İLETİŞİM ŞEKLİ */}
+          <div>
+            <label className="text-xs font-extrabold text-blue-800 flex items-center gap-1">
+              <span>📲</span> İletişim Şekli (Bize Nereden Ulaştı?)
+            </label>
+            <select
+              value={custContactMethod}
+              onChange={e => setCustContactMethod(e.target.value)}
+              className="w-full p-3 rounded-xl border border-blue-200 text-xs font-extrabold mt-1 bg-blue-50/40 text-slate-800 outline-none focus:border-blue-600 cursor-pointer"
+            >
+              <option value="Instagram">Instagram</option>
+              <option value="Telefon">Telefon</option>
+              <option value="Facebook">Facebook</option>
+              <option value="Doğuşpark">Doğuşpark</option>
+              <option value="Çelebi Nova">Çelebi Nova</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-extrabold text-slate-700">Özel Müşteri Notu</label>
+            <input
+              type="text"
+              placeholder="Örn: Evcil hayvan var, sabah 09:00 tercih ediyor..."
+              value={custNotes}
+              onChange={e => setCustNotes(e.target.value)}
+              className="w-full p-3 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-purple-600"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            {editingCustomerId && (
+              <button
+                type="button"
+                onClick={handleCancelCustomerEdit}
+                className="w-1/3 py-3 rounded-xl bg-slate-100 text-slate-700 text-xs font-extrabold hover:bg-slate-200 cursor-pointer"
+              >
+                İptal
+              </button>
+            )}
+            <button
+              type="submit"
+              className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 text-white text-xs font-black shadow-md transition-all cursor-pointer"
+            >
+              {editingCustomerId ? '💾 Müşteri Kartını Güncelle' : '+ Müşteriyi Rehbere Kaydet'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* SAĞ TARAF: ARAMA ÇUBUĞU VE MÜŞTERİ LİSTESİ */}
+      <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-3">
+          <div>
+            <h3 className="text-base font-black text-slate-900">Kayıtlı Müşteri Veritabanı (CRM)</h3>
+            <p className="text-xs text-slate-500">
+              Toplam <b>{customerList.length}</b> müşteri kayıtlı
+              {customerSearch.trim() ? ` • Arama sonucu: ${filteredCustomers.length} kayıt bulundu` : ''}
+            </p>
+          </div>
+        </div>
+
+        {/* YENİ EKLENEN ARAMA ÇUBUĞU */}
+        <div className="relative">
+          <span className="absolute left-4 top-3.5 text-slate-400 text-sm">🔍</span>
+          <input
+            type="text"
+            placeholder="Müşteri adı, telefon, adres, hizmet (Ütü, Halı vb.) veya kanal (Doğuşpark, Instagram) ara..."
+            value={customerSearch}
+            onChange={e => setCustomerSearch(e.target.value)}
+            className="w-full pl-11 pr-10 py-3 rounded-2xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs font-bold text-slate-800 outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-500/20 transition-all"
+          />
+          {customerSearch && (
+            <button
+              type="button"
+              onClick={() => setCustomerSearch('')}
+              className="absolute right-3.5 top-3 w-6 h-6 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs font-bold flex items-center justify-center cursor-pointer"
+              title="Aramayı Temizle"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* MÜŞTERİ KARTLARI LİSTESİ */}
+        {filteredCustomers.length === 0 ? (
+          <div className="text-center py-12 text-slate-400 text-xs font-medium bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+            {customerSearch.trim()
+              ? `"${customerSearch}" aramasına uygun müşteri bulunamadı.`
+              : 'Henüz müşteri kaydı bulunmuyor. Sol taraftan yeni müşteri ekleyebilirsiniz.'}
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
+            {filteredCustomers.map((cust: any) => {
+              const custOrders = ordersList.filter(
+                o =>
+                  (o.customerName &&
+                    cust.name &&
+                    o.customerName.toLocaleLowerCase('tr-TR') === cust.name.toLocaleLowerCase('tr-TR')) ||
+                  (o.phone && cust.phone && o.phone === cust.phone)
+              );
+
+              return (
+                <div
+                  key={cust.id}
+                  className="p-4 rounded-2xl border border-slate-200/90 hover:border-purple-400 bg-slate-50/50 hover:bg-white transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-2xs"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-black text-sm text-slate-900">{cust.name}</span>
+
+                      {/* Görüşülen Bölüm Etiketi */}
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">
+                        🧼 {cust.serviceArea || 'Ev Temizliği'}
+                      </span>
+
+                      {/* Periyodik Sıklık Etiketi */}
+                      {cust.period && cust.period !== 'Yok' && (
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                          🔁 {cust.period}
+                        </span>
+                      )}
+
+                      {/* İletişim Şekli Etiketi */}
+                      {cust.contactMethod && (
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                          📲 {cust.contactMethod}
+                        </span>
+                      )}
+
+                      {custOrders.length > 0 && (
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          📋 {custOrders.length} Sipariş
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 font-medium">
+                      {cust.phone && <span className="font-bold text-slate-700">📱 {cust.phone}</span>}
+                      {cust.address && <span>📍 {cust.address}</span>}
+                    </div>
+
+                    {cust.notes && (
+                      <p className="text-[11px] text-amber-800 bg-amber-50/80 px-2.5 py-1 rounded-lg border border-amber-200/60 w-fit font-medium">
+                        📝 Not: {cust.notes}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-center">
+                    {cust.phone && (
+                      <a
+                        href={`https://wa.me/90${cust.phone.replace(/\D/g, '').replace(/^0/, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-2xs flex items-center gap-1"
+                        title="WhatsApp Mesajı Gönder"
+                      >
+                        💬 WhatsApp
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleEditCustomerClick(cust)}
+                      className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs cursor-pointer"
+                      title="Müşteri Bilgilerini Düzenle"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCustomer(cust.id)}
+                      className="p-2 rounded-xl bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 text-xs cursor-pointer"
+                      title="Müşteriyi Sil"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
