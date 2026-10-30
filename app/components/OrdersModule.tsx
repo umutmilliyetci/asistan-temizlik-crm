@@ -10,7 +10,7 @@ interface Props {
   priceCategories: PriceCategory[];
   customerList: Customer[];
   setCustomerList: React.Dispatch<React.SetStateAction<Customer[]>>;
-  // Takvim entegrasyonu için yeni proplar
+  // Takvim entegrasyonu için proplar
   calendarData?: any;
   setCalendarData?: any;
 }
@@ -39,6 +39,10 @@ export default function OrdersModule({
   const [jobType, setJobType] = useState('Ev Temizliği');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
+  
+  // YENİ EKLENEN: PERSONEL / FASON ÖDEMESİ
+  const [staffPayment, setStaffPayment] = useState('');
+  
   const [staffId, setStaffId] = useState('');
   const [status, setStatus] = useState<'Bekliyor' | 'İşlemde' | 'Teslim Edildi' | 'İptal'>('Bekliyor');
   const [desc, setDesc] = useState('');
@@ -58,6 +62,7 @@ export default function OrdersModule({
     setJobType('Ev Temizliği');
     setQuantity('');
     setPrice('');
+    setStaffPayment(''); // Yeni alan sıfırlanıyor
     setStaffId('');
     setStatus('Bekliyor');
     setDesc('');
@@ -91,10 +96,9 @@ export default function OrdersModule({
     };
 
     setCustomerList(prev => [newCust, ...prev]);
-    setSelectedCustId(newId); // Formda otomatik seçili gelsin
+    setSelectedCustId(newId);
     setIsQuickCustModalOpen(false);
     
-    // Temizle
     setQcName('');
     setQcPhone('');
     setQcAddress('');
@@ -112,7 +116,7 @@ export default function OrdersModule({
     if (!selectedCust) return;
 
     // Tarihi DD.MM.YYYY formatına çevir
-    const dateParts = orderDateInput.split('-'); // [2026, 10, 25]
+    const dateParts = orderDateInput.split('-');
     const formattedDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : orderDateInput;
 
     if (editingOrderId) {
@@ -130,6 +134,7 @@ export default function OrdersModule({
                 quantity: isQuantityActive ? Number(quantity) || 0 : undefined,
                 description: desc,
                 price: Number(price) || 0,
+                staffPayment: staffPayment ? Number(staffPayment) : undefined, // Maliyet Güncelleniyor
                 orderStatus: status,
                 staffId: staffId || undefined
               }
@@ -137,8 +142,7 @@ export default function OrdersModule({
         )
       );
     } else {
-      // YENİ SİPARİŞ EKLE
-      // Otomatik ZEY-XXX İş Emri Numarası bul
+      // YENİ SİPARİŞ EKLE VE ZEY NUMARASI AL
       const existingOrders = ordersList.map((o: any) => {
         const match = (o.orderNo || '').match(/ZEY-(\d+)/);
         return match ? parseInt(match[1], 10) : 0;
@@ -157,11 +161,12 @@ export default function OrdersModule({
         quantity: isQuantityActive ? Number(quantity) || 0 : undefined,
         description: desc,
         price: Number(price) || 0,
+        staffPayment: staffPayment ? Number(staffPayment) : undefined, // Maliyet Ekleniyor
         orderStatus: status,
         staffId: staffId || undefined
       };
 
-      // TAKVİME OTOMATİK EKLEME MANTIĞI (Ev Temizliği ve Personel Varsa)
+      // TAKVİME OTOMATİK EKLEME MANTIĞI
       if (jobType === 'Ev Temizliği' && staffId && setCalendarData && dateParts.length === 3) {
         const selectedStaff = staffList.find(s => s.id === staffId);
         if (selectedStaff) {
@@ -174,13 +179,14 @@ export default function OrdersModule({
               [selectedStaff.name]: {
                 status: 'Asistan',
                 customerName: selectedCust.name,
-                jobType: 'Daire', // Varsayılan değer
+                jobType: 'Daire',
                 duration: 'Tam Gün',
                 floor: 'Bilinmiyor',
                 rooms: '3+1',
                 description: desc || 'Siparişten otomatik eklendi.',
                 price: Number(price) || 0,
-                staffCost: Number(selectedStaff.dailyWage) || 0
+                // Eğer formda özel bir maliyet girildiyse takvime onu yansıt, yoksa personelin yevmiyesini çek
+                staffCost: staffPayment ? Number(staffPayment) : (Number(selectedStaff.dailyWage) || 0)
               }
             }
           }));
@@ -205,7 +211,6 @@ export default function OrdersModule({
     const cust = customerList.find(c => c.name === order.customerName || c.phone === order.phone);
     if (cust) setSelectedCustId(cust.id);
 
-    // Tarihi YYYY-MM-DD formatına geri çevirme
     let initDate = todayISO;
     if (order.date) {
       const parts = order.date.split('.');
@@ -219,6 +224,10 @@ export default function OrdersModule({
     setJobType(order.jobType);
     setQuantity(order.quantity ? String(order.quantity) : '');
     setPrice(String(order.price));
+    
+    // Eski fasonCost veya yeni staffPayment değerini okuyup forma yansıtıyoruz
+    setStaffPayment(order.staffPayment !== undefined ? String(order.staffPayment) : (order.fasonCost !== undefined ? String(order.fasonCost) : ''));
+    
     setStaffId(order.staffId || '');
     setStatus(order.orderStatus as any);
     setDesc(order.description || '');
@@ -237,9 +246,9 @@ export default function OrdersModule({
   const pastOrders = ordersList.filter(o => o.orderStatus === 'Teslim Edildi' || o.orderStatus === 'İptal');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-4">
       {/* ÜST BİLGİ VE YENİ SİPARİŞ BUTONU */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-slate-200 shadow-sm gap-4 relative z-10">
         <div>
           <h2 className="text-xl font-black text-slate-900">İş Emirleri & Siparişler</h2>
           <p className="text-xs font-medium text-slate-500 mt-1">Sipariş (ZEY) numaraları otomatik verilir ve takipleşir.</p>
@@ -296,11 +305,19 @@ export default function OrdersModule({
                     <span className="text-sm font-black text-teal-700 bg-teal-100 px-3 py-1.5 rounded-xl border border-teal-200">
                       {(o.price || 0).toLocaleString('tr-TR')} ₺
                     </span>
-                    {o.quantity && (
+                    
+                    {/* PERSONEL MALİYETİ ROZETİ */}
+                    {o.staffPayment ? (
+                      <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                        Maliyet: {o.staffPayment.toLocaleString('tr-TR')} ₺
+                      </span>
+                    ) : null}
+
+                    {o.quantity ? (
                       <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
                         Adet/m²: {o.quantity}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
@@ -416,7 +433,7 @@ export default function OrdersModule({
       {/* YENİ / DÜZENLE SİPARİŞ MODALI */}
       {isOrderModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-xl shadow-2xl space-y-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl space-y-4">
             <h3 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-3">
               {editingOrderId ? 'İş Emrini Düzenle' : 'Yeni İş Emri Aç'}
             </h3>
@@ -497,8 +514,8 @@ export default function OrdersModule({
                 </div>
               )}
 
-              {/* m2 / FİYAT */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* YENİ 3 SÜTUNLU TASARIM: m2 / FİYAT / MALİYET */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className={`p-2.5 rounded-xl transition-all ${isQuantityActive ? 'bg-teal-50/50 border border-teal-200' : 'bg-slate-100 border border-slate-200 opacity-60'}`}>
                   <label className="text-xs font-bold text-slate-700">Toplam m² / Adet</label>
                   <input 
@@ -510,14 +527,26 @@ export default function OrdersModule({
                     className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-bold mt-1 disabled:bg-slate-100 outline-none focus:border-teal-600" 
                   />
                 </div>
-                <div className="p-2.5">
-                  <label className="text-xs font-bold text-slate-700">Müşteri Fiyatı (₺) *</label>
+                
+                <div className="p-2.5 bg-teal-50/30 rounded-xl border border-teal-100">
+                  <label className="text-xs font-black text-teal-900">Müşteri Fiyatı (₺) *</label>
                   <input
                     type="number"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-teal-600 bg-teal-50/20"
+                    className="w-full p-2.5 rounded-xl border border-teal-300 text-xs font-bold mt-1 outline-none focus:border-teal-600 bg-white"
                     required
+                  />
+                </div>
+
+                <div className="p-2.5 bg-rose-50/30 rounded-xl border border-rose-100">
+                  <label className="text-xs font-black text-rose-900">Personel/Fason Ödemesi</label>
+                  <input
+                    type="number"
+                    value={staffPayment}
+                    onChange={e => setStaffPayment(e.target.value)}
+                    placeholder="Örn: 1500"
+                    className="w-full p-2.5 rounded-xl border border-rose-300 text-xs font-bold mt-1 outline-none focus:border-rose-600 bg-white"
                   />
                 </div>
               </div>
