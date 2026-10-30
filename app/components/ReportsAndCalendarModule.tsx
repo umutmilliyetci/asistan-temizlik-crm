@@ -41,13 +41,37 @@ export default function ReportsAndCalendarModule({
 }: Props) {
   
   // ==========================================
-  // TAKVİM (CALENDAR) STATE VE FONKSİYONLARI
+  // TAKVİM (CALENDAR) YENİ 30 GÜN MANTIĞI
   // ==========================================
-  const todayStr = String(new Date().getDate());
-  const [selectedDay, setSelectedDay] = useState(todayStr);
+  const monthNames = [
+    "Oca", "Şub", "Mar", "Nis", "May", "Haz", 
+    "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"
+  ];
   
-  // 31 günlük ay şeridi
-  const daysInMonth = Array.from({ length: 31 }, (_, i) => String(i + 1));
+  // Bugünden itibaren ileriye doğru 30 günlük dinamik liste
+  const next30Days = useMemo(() => {
+    const days = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const yearStr = d.getFullYear();
+      
+      days.push({
+        dateKey: `${dayStr}.${monthStr}.${yearStr}`, // Sistemin arka plandaki anahtarı
+        displayDay: d.getDate(), // Ekranda büyük yazan rakam
+        displayMonth: monthNames[d.getMonth()] // Ekranda küçük yazan ay adı
+      });
+    }
+    return days;
+  }, []);
+
+  // Varsayılan olarak bugünü seçili getir
+  const [selectedDay, setSelectedDay] = useState(next30Days[0].dateKey);
 
   // Takvim Modal State'leri
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
@@ -86,6 +110,7 @@ export default function ReportsAndCalendarModule({
       setEvRooms('3+1');
       setEvPrice('');
       
+      // Personelin varsayılan yevmiyesini getir
       const staffInfo = staffList.find(s => s.name === staffName);
       setEvStaffCost(staffInfo?.dailyWage ? String(staffInfo.dailyWage) : '');
       setEvDesc('');
@@ -118,7 +143,7 @@ export default function ReportsAndCalendarModule({
   };
 
   const handleDeleteEvent = (staffName: string) => {
-    if (confirm(`${selectedDay}. gün için ${staffName} adlı personelin görevini silmek istediğinize emin misiniz?`)) {
+    if (confirm(`${selectedDay} tarihi için ${staffName} adlı personelin görevini silmek istediğinize emin misiniz?`)) {
       setCalendarData((prev: any) => {
         const dayData = { ...prev[selectedDay] };
         delete dayData[staffName];
@@ -155,11 +180,18 @@ export default function ReportsAndCalendarModule({
     }, 0);
 
     // Kasa/Finans modülünden girilen ekstra gelir-giderler
-    const manualIncome = transactions.filter(t => t.category === 'Gelir').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-    const manualOutflow = transactions.filter(t => t.category === 'Fason Hakediş' || t.category === 'Personel Ödemesi').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-    
+    const manualIncome = transactions
+      .filter(t => t.category === 'Gelir')
+      .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      
+    const manualOutflow = transactions
+      .filter(t => t.category === 'Fason Hakediş' || t.category === 'Personel Ödemesi')
+      .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      
     const totalExtraExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount || 0), 0) + 
-                               transactions.filter(t => t.category === 'Gider').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+                               transactions
+                                .filter(t => t.category === 'Gider')
+                                .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
     const totalTurnover = orderTurnover + manualIncome;
     const totalCosts = orderCosts + manualOutflow;
@@ -172,7 +204,7 @@ export default function ReportsAndCalendarModule({
       serviceBreakdown[type] = (serviceBreakdown[type] || 0) + Number(o.price || o.totalAmount || 0);
     });
 
-    // Personel Performans Analizi (Siparişlere atanmış personeller üzerinden)
+    // Personel Performans Analizi
     const staffPerformance: Record<string, { count: number, turnover: number }> = {};
     deliveredOrders.forEach((o: any) => {
       if (o.staffId) {
@@ -211,34 +243,38 @@ export default function ReportsAndCalendarModule({
     return (
       <div className="space-y-6 pt-4">
         
-        {/* ÜST BİLGİ VE GÜN ŞERİDİ */}
+        {/* ÜST BİLGİ VE DİNAMİK GÜN ŞERİDİ */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative z-10">
+          
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-5 gap-4">
             <div>
               <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
                 📅 Saha Takvimi ve Personel Planlama
               </h2>
               <p className="text-xs font-medium text-slate-500 mt-1.5">
-                Sipariş ekranından Ev Temizliği girildiğinde buraya otomatik düşer. İsterseniz manuel de ekleyebilirsiniz.
+                Bugünden itibaren 30 günlük dinamik iş planı. Yeni siparişler otomatik düşer.
               </p>
             </div>
+            
             <div className="px-5 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 font-black text-sm rounded-2xl border border-blue-200 shadow-sm flex items-center gap-2">
-              <span>Seçili Gün:</span>
-              <span className="text-lg text-blue-600">Ayın {selectedDay}. Günü</span>
+              <span>Seçili Tarih:</span>
+              <span className="text-lg text-blue-600">{selectedDay}</span>
             </div>
           </div>
 
-          {/* 31 GÜNLÜK KAYDIRMALI ŞERİT */}
+          {/* 30 GÜNLÜK KAYDIRMALI ŞERİT (Bugünden başlar) */}
           <div className="flex gap-2.5 overflow-x-auto py-6 custom-scrollbar pb-5">
-            {daysInMonth.map(day => {
-              const hasEvent = calendarData[day] && Object.keys(calendarData[day]).length > 0;
-              const isSelected = day === selectedDay;
+            {next30Days.map(item => {
+              const hasEvent = calendarData[item.dateKey] && Object.keys(calendarData[item.dateKey]).length > 0;
+              const isSelected = item.dateKey === selectedDay;
               
               return (
                 <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={`min-w-[72px] h-20 rounded-2xl flex flex-col items-center justify-center font-black transition-all duration-300 cursor-pointer relative shadow-sm
+                  key={item.dateKey}
+                  onClick={() => setSelectedDay(item.dateKey)}
+                  className={`
+                    min-w-[72px] h-20 rounded-2xl flex flex-col items-center justify-center 
+                    font-black transition-all duration-300 cursor-pointer relative shadow-sm
                     ${isSelected 
                       ? 'bg-gradient-to-b from-blue-600 to-indigo-600 text-white scale-105 shadow-xl shadow-blue-500/30' 
                       : 'bg-white text-slate-600 hover:bg-blue-50 border border-slate-200 hover:border-blue-300'
@@ -246,15 +282,17 @@ export default function ReportsAndCalendarModule({
                   `}
                 >
                   <span className="text-[10px] uppercase tracking-wider opacity-80 font-bold mb-1">
-                    Gün
+                    {item.displayMonth}
                   </span>
+                  
                   <span className="text-2xl leading-none">
-                    {day}
+                    {item.displayDay}
                   </span>
                   
                   {hasEvent && !isSelected && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm border-2 border-white"></span>
                   )}
+                  
                   {hasEvent && isSelected && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] animate-pulse"></span>
                   )}
@@ -268,7 +306,7 @@ export default function ReportsAndCalendarModule({
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 className="text-base font-black text-slate-900">
-              Ayın {selectedDay}. Günü - Personel Görev Dağılımı
+              {selectedDay} - Personel Görev Dağılımı
             </h3>
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
               Toplam {staffList.length} Personel
@@ -282,13 +320,16 @@ export default function ReportsAndCalendarModule({
               return (
                 <div 
                   key={staff.id} 
-                  className={`p-5 rounded-3xl border transition-all duration-300 flex flex-col ${
-                    event 
-                      ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border-blue-200 shadow-md' 
-                      : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`
+                    p-5 rounded-3xl border transition-all duration-300 flex flex-col 
+                    ${event 
+                        ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border-blue-200 shadow-md' 
+                        : 'bg-slate-50/50 border-slate-200 hover:bg-slate-100'
+                    }
+                  `}
                 >
                   
+                  {/* Kart Üst Bilgisi */}
                   <div className="flex justify-between items-start mb-4">
                     <div className="font-black text-slate-900 text-sm flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm shadow-inner border border-slate-300/50">
@@ -315,6 +356,7 @@ export default function ReportsAndCalendarModule({
                     )}
                   </div>
 
+                  {/* Etkinlik Detayları */}
                   {event ? (
                     <div className="flex flex-col flex-1 space-y-3">
                       <div className="p-4 bg-white rounded-2xl border border-blue-100 shadow-sm space-y-2.5 flex-1">
@@ -356,7 +398,7 @@ export default function ReportsAndCalendarModule({
                           
                           <div className="flex flex-col items-end">
                             <span className="text-[9px] text-slate-400 font-bold uppercase">
-                              Yevmiye
+                              Yevmiye / Maliyet
                             </span>
                             <span className="text-xs font-extrabold text-rose-700">
                               {event.staffCost?.toLocaleString('tr-TR')} ₺
@@ -393,7 +435,7 @@ export default function ReportsAndCalendarModule({
                         ☕
                       </div>
                       <p className="text-[11px] text-slate-400 font-bold">
-                        Personel bu gün için görevlendirilmemiş.
+                        Personel bu tarihte görevlendirilmemiş.
                       </p>
                       <button 
                         onClick={() => handleOpenEventModal(staff.name)} 
@@ -420,7 +462,7 @@ export default function ReportsAndCalendarModule({
                     Takvim Kaydı Oluştur / Düzenle
                   </h3>
                   <p className="text-xs font-bold text-blue-600 mt-1">
-                    Personel: {editingStaff} | Seçili Gün: Ayın {selectedDay}. Günü
+                    Personel: {editingStaff} | Seçili Tarih: {selectedDay}
                   </p>
                 </div>
                 <button 
@@ -433,7 +475,6 @@ export default function ReportsAndCalendarModule({
               
               <form onSubmit={handleSaveEvent} className="space-y-4">
                 
-                {/* Manuel Müşteri Adı */}
                 <div>
                   <label className="text-xs font-extrabold text-slate-700">
                     Müşteri Adı Soyadı *
