@@ -3,7 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import { StaffMember, Customer, Order, Expense } from './types';
 
-// Takvim etkinlik modeli
+// ==========================================
+// TAKVİM ETKİNLİK MODELİ
+// ==========================================
 export interface CalendarEvent {
   status: string;
   customerName: string;
@@ -14,8 +16,12 @@ export interface CalendarEvent {
   description: string;
   price: number;
   staffCost: number;
+  isAutoOrder?: boolean;
 }
 
+// ==========================================
+// BİLEŞEN PROPLARI
+// ==========================================
 interface Props {
   mode: 'reports' | 'calendar';
   ordersList: Order[];
@@ -25,7 +31,11 @@ interface Props {
   setCustomerList: React.Dispatch<React.SetStateAction<Customer[]>>;
   expenses: Expense[];
   transactions: any[];
-  calendarData: { [day: string]: { [staffName: string]: CalendarEvent } };
+  calendarData: { 
+    [day: string]: { 
+      [staffName: string]: CalendarEvent 
+    } 
+  };
   setCalendarData: React.Dispatch<React.SetStateAction<any>>;
 }
 
@@ -41,14 +51,13 @@ export default function ReportsAndCalendarModule({
 }: Props) {
   
   // ==========================================
-  // TAKVİM (CALENDAR) YENİ 30 GÜN MANTIĞI
+  // TAKVİM (CALENDAR) 30 GÜN MANTIĞI
   // ==========================================
   const monthNames = [
     "Oca", "Şub", "Mar", "Nis", "May", "Haz", 
     "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"
   ];
   
-  // Bugünden itibaren ileriye doğru 30 günlük dinamik liste
   const next30Days = useMemo(() => {
     const days = [];
     const today = new Date();
@@ -62,22 +71,58 @@ export default function ReportsAndCalendarModule({
       const yearStr = d.getFullYear();
       
       days.push({
-        dateKey: `${dayStr}.${monthStr}.${yearStr}`, // Sistemin arka plandaki anahtarı
-        displayDay: d.getDate(), // Ekranda büyük yazan rakam
-        displayMonth: monthNames[d.getMonth()] // Ekranda küçük yazan ay adı
+        dateKey: `${dayStr}.${monthStr}.${yearStr}`,
+        displayDay: d.getDate(),
+        displayMonth: monthNames[d.getMonth()]
       });
     }
     return days;
   }, []);
 
-  // Varsayılan olarak bugünü seçili getir
   const [selectedDay, setSelectedDay] = useState(next30Days[0].dateKey);
 
-  // Takvim Modal State'leri
+  // ==========================================
+  // AKILLI TAKVİM BİRLEŞTİRİCİ
+  // Siparişleri ve manuel takvim kayıtlarını birleştirir
+  // ==========================================
+  const getComputedDayData = (dayKey: string) => {
+    // 1. Kullanıcının elle girdiği takvim kayıtları
+    const mergedData: { [staffName: string]: CalendarEvent } = { 
+      ...(calendarData[dayKey] || {}) 
+    };
+
+    // 2. Siparişlerden (Orders) gelen otomatik kayıtlar
+    ordersList.forEach(o => {
+      if (o.date === dayKey && o.staffId && o.orderStatus !== 'İptal') {
+        const staff = staffList.find(s => s.id === o.staffId);
+        
+        if (staff) {
+          mergedData[staff.name] = {
+            status: o.orderStatus === 'Teslim Edildi' ? 'Tamamlandı' : (o.orderStatus === 'İşlemde' ? 'İşlemde' : 'Asistan'),
+            customerName: o.customerName || 'Bilinmeyen Müşteri',
+            jobType: o.jobType || 'Bilinmiyor',
+            duration: 'Sipariş Kaydı',
+            floor: 'Sipariş',
+            rooms: o.quantity ? String(o.quantity) : '-',
+            description: o.description || 'İş emirlerinden otomatik yansıdı.',
+            price: Number(o.price) || 0,
+            staffCost: Number(o.staffPayment) || 0,
+            isAutoOrder: true // Siparişten geldiğini işaretler
+          };
+        }
+      }
+    });
+
+    return mergedData;
+  };
+
+
+  // ==========================================
+  // TAKVİM MODAL STATE'LERİ
+  // ==========================================
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState('');
   
-  // Modal Form State'leri
   const [evCustName, setEvCustName] = useState('');
   const [evJobType, setEvJobType] = useState('Daire');
   const [evDuration, setEvDuration] = useState('Tam Gün');
@@ -89,6 +134,12 @@ export default function ReportsAndCalendarModule({
   const [evDesc, setEvDesc] = useState('');
 
   const handleOpenEventModal = (staffName: string, existingEvent?: CalendarEvent) => {
+    
+    // Otomatik siparişse düzenlemeyi engelle
+    if (existingEvent?.isAutoOrder) {
+      return;
+    }
+
     setEditingStaff(staffName);
     
     if (existingEvent) {
@@ -110,17 +161,20 @@ export default function ReportsAndCalendarModule({
       setEvRooms('3+1');
       setEvPrice('');
       
-      // Personelin varsayılan yevmiyesini getir
       const staffInfo = staffList.find(s => s.name === staffName);
       setEvStaffCost(staffInfo?.dailyWage ? String(staffInfo.dailyWage) : '');
       setEvDesc('');
     }
+    
     setIsEventModalOpen(true);
   };
 
   const handleSaveEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!evCustName.trim()) return;
+    
+    if (!evCustName.trim()) {
+      return;
+    }
 
     setCalendarData((prev: any) => ({
       ...prev,
@@ -135,15 +189,17 @@ export default function ReportsAndCalendarModule({
           rooms: evRooms,
           description: evDesc.trim(),
           price: Number(evPrice) || 0,
-          staffCost: Number(evStaffCost) || 0
+          staffCost: Number(evStaffCost) || 0,
+          isAutoOrder: false
         }
       }
     }));
+    
     setIsEventModalOpen(false);
   };
 
   const handleDeleteEvent = (staffName: string) => {
-    if (confirm(`${selectedDay} tarihi için ${staffName} adlı personelin görevini silmek istediğinize emin misiniz?`)) {
+    if (confirm(`${selectedDay} tarihi için ${staffName} adlı personelin manuel görevini silmek istediğinize emin misiniz?`)) {
       setCalendarData((prev: any) => {
         const dayData = { ...prev[selectedDay] };
         delete dayData[staffName];
@@ -162,12 +218,10 @@ export default function ReportsAndCalendarModule({
     const deliveredOrders = ordersList.filter(o => o.orderStatus === 'Teslim Edildi');
     const canceledOrders = ordersList.filter(o => o.orderStatus === 'İptal');
     
-    // Teslim edilen işlerden elde edilen ciro
     const orderTurnover = deliveredOrders.reduce((acc, o: any) => {
       return acc + Number(o.price || o.totalAmount || 0);
     }, 0);
     
-    // İşlerin maliyeti (Personel / Fason)
     const orderCosts = deliveredOrders.reduce((acc, o: any) => {
       if (o.staffPayment !== undefined && o.staffPayment !== '') {
         return acc + Number(o.staffPayment);
@@ -176,10 +230,9 @@ export default function ReportsAndCalendarModule({
         return acc + Number(o.fasonCost);
       }
       const amount = Number(o.price || o.totalAmount || 0);
-      return acc + Math.round(amount * 0.65); // Varsayılan %65 maliyet
+      return acc + Math.round(amount * 0.65);
     }, 0);
 
-    // Kasa/Finans modülünden girilen ekstra gelir-giderler
     const manualIncome = transactions
       .filter(t => t.category === 'Gelir')
       .reduce((acc, t) => acc + Number(t.amount || 0), 0);
@@ -197,14 +250,12 @@ export default function ReportsAndCalendarModule({
     const totalCosts = orderCosts + manualOutflow;
     const netProfit = totalTurnover - (totalCosts + totalExtraExpenses);
 
-    // Hizmet türüne göre ciro dağılımı
     const serviceBreakdown: Record<string, number> = {};
     deliveredOrders.forEach((o: any) => {
       const type = o.jobType || 'Diğer';
       serviceBreakdown[type] = (serviceBreakdown[type] || 0) + Number(o.price || o.totalAmount || 0);
     });
 
-    // Personel Performans Analizi
     const staffPerformance: Record<string, { count: number, turnover: number }> = {};
     deliveredOrders.forEach((o: any) => {
       if (o.staffId) {
@@ -221,14 +272,14 @@ export default function ReportsAndCalendarModule({
     });
 
     return {
-      totalTurnover,
-      totalCosts,
-      totalExtraExpenses,
+      totalTurnover, 
+      totalCosts, 
+      totalExtraExpenses, 
       netProfit,
-      deliveredCount: deliveredOrders.length,
+      deliveredCount: deliveredOrders.length, 
       canceledCount: canceledOrders.length,
-      deliveredOrders,
-      serviceBreakdown,
+      deliveredOrders, 
+      serviceBreakdown, 
       staffPerformance
     };
   }, [ordersList, expenses, transactions, staffList]);
@@ -238,7 +289,9 @@ export default function ReportsAndCalendarModule({
   // EKRAN 1: SAHA TAKVİMİ MODÜLÜ
   // ==========================================
   if (mode === 'calendar') {
-    const currentDayData = calendarData[selectedDay] || {};
+    
+    // Canlı hesaplanmış veriyi alıyoruz
+    const currentDayData = getComputedDayData(selectedDay);
 
     return (
       <div className="space-y-6 pt-4">
@@ -258,14 +311,17 @@ export default function ReportsAndCalendarModule({
             
             <div className="px-5 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 font-black text-sm rounded-2xl border border-blue-200 shadow-sm flex items-center gap-2">
               <span>Seçili Tarih:</span>
-              <span className="text-lg text-blue-600">{selectedDay}</span>
+              <span className="text-lg text-blue-600">
+                {selectedDay}
+              </span>
             </div>
           </div>
 
           {/* 30 GÜNLÜK KAYDIRMALI ŞERİT (Bugünden başlar) */}
           <div className="flex gap-2.5 overflow-x-auto py-6 custom-scrollbar pb-5">
             {next30Days.map(item => {
-              const hasEvent = calendarData[item.dateKey] && Object.keys(calendarData[item.dateKey]).length > 0;
+              
+              const dayHasEvent = Object.keys(getComputedDayData(item.dateKey)).length > 0;
               const isSelected = item.dateKey === selectedDay;
               
               return (
@@ -289,11 +345,11 @@ export default function ReportsAndCalendarModule({
                     {item.displayDay}
                   </span>
                   
-                  {hasEvent && !isSelected && (
+                  {dayHasEvent && !isSelected && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm border-2 border-white"></span>
                   )}
                   
-                  {hasEvent && isSelected && (
+                  {dayHasEvent && isSelected && (
                     <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] animate-pulse"></span>
                   )}
                 </button>
@@ -304,6 +360,7 @@ export default function ReportsAndCalendarModule({
 
         {/* SEÇİLİ GÜNÜN PERSONEL LİSTESİ */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+          
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <h3 className="text-base font-black text-slate-900">
               {selectedDay} - Personel Görev Dağılımı
@@ -315,6 +372,7 @@ export default function ReportsAndCalendarModule({
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {staffList.map(staff => {
+              
               const event = currentDayData[staff.name];
 
               return (
@@ -329,7 +387,6 @@ export default function ReportsAndCalendarModule({
                   `}
                 >
                   
-                  {/* Kart Üst Bilgisi */}
                   <div className="flex justify-between items-start mb-4">
                     <div className="font-black text-slate-900 text-sm flex items-center gap-2.5">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center text-sm shadow-inner border border-slate-300/50">
@@ -347,7 +404,7 @@ export default function ReportsAndCalendarModule({
                     
                     {event ? (
                       <span className="text-[10px] font-black px-3 py-1.5 rounded-xl bg-blue-600 text-white shadow-sm uppercase tracking-wider">
-                        Görevde
+                        {event.status === 'Tamamlandı' ? 'TAMAMLANDI' : 'GÖREVDE'}
                       </span>
                     ) : (
                       <span className="text-[10px] font-black px-3 py-1.5 rounded-xl bg-slate-200 text-slate-600 uppercase tracking-wider">
@@ -356,13 +413,21 @@ export default function ReportsAndCalendarModule({
                     )}
                   </div>
 
-                  {/* Etkinlik Detayları */}
                   {event ? (
                     <div className="flex flex-col flex-1 space-y-3">
+                      
                       <div className="p-4 bg-white rounded-2xl border border-blue-100 shadow-sm space-y-2.5 flex-1">
                         
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-extrabold">
+                          <span 
+                            className={`
+                              text-[10px] px-2 py-0.5 rounded font-extrabold 
+                              ${event.status === 'Tamamlandı' 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-blue-100 text-blue-800'
+                              }
+                            `}
+                          >
                             {event.status}
                           </span>
                           <span className="text-xs font-black text-slate-800 line-clamp-1">
@@ -377,11 +442,6 @@ export default function ReportsAndCalendarModule({
                           <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">
                             ⏱️ {event.duration}
                           </span>
-                          {event.rooms && event.rooms !== 'Bilinmiyor' && (
-                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">
-                              🏠 {event.rooms}
-                            </span>
-                          )}
                         </div>
                         
                         <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-100">
@@ -405,6 +465,7 @@ export default function ReportsAndCalendarModule({
                             </span>
                           </div>
                         </div>
+
                       </div>
                       
                       {event.description && (
@@ -414,20 +475,30 @@ export default function ReportsAndCalendarModule({
                         </div>
                       )}
 
-                      <div className="flex gap-2 pt-2">
-                        <button 
-                          onClick={() => handleOpenEventModal(staff.name, event)} 
-                          className="flex-1 py-2.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
-                        >
-                          ✏️ Düzenle
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteEvent(staff.name)} 
-                          className="flex-1 py-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
-                        >
-                          🗑️ Sil
-                        </button>
-                      </div>
+                      {/* OTOMATİK SİPARİŞ KONTROLÜ */}
+                      {event.isAutoOrder ? (
+                         <div className="flex gap-2 pt-2">
+                           <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-1.5 rounded-xl w-full text-center border border-indigo-100 shadow-sm flex items-center justify-center gap-1.5">
+                             <span>🔄</span> Sipariş Kaydından Geldi
+                           </span>
+                         </div>
+                      ) : (
+                        <div className="flex gap-2 pt-2">
+                          <button 
+                            onClick={() => handleOpenEventModal(staff.name, event)} 
+                            className="flex-1 py-2.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                          >
+                            ✏️ Düzenle
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteEvent(staff.name)} 
+                            className="flex-1 py-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm"
+                          >
+                            🗑️ Sil
+                          </button>
+                        </div>
+                      )}
+
                     </div>
                   ) : (
                     <div className="mt-4 pt-6 border-t border-slate-200/60 flex flex-col items-center justify-center gap-3 flex-1">
@@ -445,6 +516,7 @@ export default function ReportsAndCalendarModule({
                       </button>
                     </div>
                   )}
+
                 </div>
               );
             })}
@@ -590,7 +662,7 @@ export default function ReportsAndCalendarModule({
                 </div>
 
                 <div className="text-[11px] text-slate-600 bg-blue-50/50 p-3.5 rounded-xl border border-blue-100 font-medium">
-                  💡 <b>Bilgi:</b> Takvime eklediğiniz bu manuel kayıt sadece personelin günlük saha planlamasını ayarlamak içindir. Sistemin ana cirosuna yansıması için asıl işlemin <b>"İş Emirleri & Siparişler"</b> sekmesinden ZEY- numarası ile girilmesi gerekir.
+                  💡 <b>Bilgi:</b> Takvime eklediğiniz bu manuel kayıt sadece personelin günlük saha planlamasını ayarlamak içindir. Sistemin ana cirosuna yansıması için asıl işlemin <b>"İş Emirleri & Siparişler"</b> sekmesinden girilmesi gerekir.
                 </div>
 
                 <div className="flex gap-3 pt-4 border-t border-slate-100">
@@ -608,6 +680,7 @@ export default function ReportsAndCalendarModule({
                     💾 Takvime Kaydet
                   </button>
                 </div>
+                
               </form>
             </div>
           </div>
@@ -891,11 +964,21 @@ export default function ReportsAndCalendarModule({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">İş Emri No</th>
-                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">Müşteri</th>
-                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">Tarih</th>
-                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">Hizmet Türü</th>
-                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider text-right">Tahsilat (Ciro)</th>
+                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">
+                  İş Emri No
+                </th>
+                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">
+                  Müşteri
+                </th>
+                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">
+                  Tarih
+                </th>
+                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider">
+                  Hizmet Türü
+                </th>
+                <th className="p-4 text-xs font-black text-slate-500 uppercase tracking-wider text-right">
+                  Tahsilat (Ciro)
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
