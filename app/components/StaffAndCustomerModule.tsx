@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StaffMember, Customer, Order } from './types';
 
 interface Props {
@@ -28,6 +28,7 @@ export default function StaffAndCustomerModule({
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
 
   // --- MÜŞTERİ STATE'LERİ ---
+  const [custNo, setCustNo] = useState('');
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
   const [custAddress, setCustAddress] = useState('');
@@ -39,6 +40,22 @@ export default function StaffAndCustomerModule({
 
   // --- ARAMA STATE'İ ---
   const [customerSearch, setCustomerSearch] = useState('');
+
+  // ==========================================
+  // AKILLI NUMARATÖR (ETK-) KONTROLÜ
+  // ==========================================
+  // Sistemde var olan en büyük ETK numarasını bulur ve yeni form açıldığında sıradakini kutuya otomatik yazar
+  useEffect(() => {
+    if (!editingCustomerId) {
+      const existingNumbers = customerList.map((c: any) => {
+        const match = (c.customerNo || '').match(/ETK-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      });
+      const maxNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      setCustNo(`ETK-${String(maxNum + 1).padStart(3, '0')}`);
+    }
+  }, [customerList, editingCustomerId]);
+
 
   // --- PERSONEL EKLE / GÜNCELLE ---
   const handleAddOrUpdateStaff = (e: React.FormEvent) => {
@@ -92,10 +109,10 @@ export default function StaffAndCustomerModule({
     }
   };
 
-  // --- MÜŞTERİ EKLE / GÜNCELLE (OTOMATİK ETK- NUMARATÖRLÜ) ---
+  // --- MÜŞTERİ KAYDET / GÜNCELLE (MANUEL DÜZENLENEBİLİR ETK-) ---
   const handleAddOrUpdateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!custName.trim()) return;
+    if (!custName.trim() || !custNo.trim()) return;
 
     if (editingCustomerId) {
       setCustomerList(prev =>
@@ -103,6 +120,7 @@ export default function StaffAndCustomerModule({
           c.id === editingCustomerId
             ? {
                 ...c,
+                customerNo: custNo.trim(), // Formdaki mevcut veya elle düzeltilmiş noyu alır
                 name: custName.trim(),
                 phone: custPhone.trim(),
                 address: custAddress.trim(),
@@ -116,19 +134,9 @@ export default function StaffAndCustomerModule({
       );
       setEditingCustomerId(null);
     } else {
-      // Mevcut en büyük ETK numarasını bul
-      const existingNumbers = customerList.map((c: any) => {
-        const match = (c.customerNo || '').match(/ETK-(\d+)/);
-        return match ? parseInt(match[1], 10) : 0;
-      });
-      const maxNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      
-      // Yeni numarayı oluştur (Örn: ETK-001, ETK-015)
-      const nextCustomerNo = `ETK-${String(maxNum + 1).padStart(3, '0')}`;
-
       const newCustomer: any = {
         id: Date.now().toString(),
-        customerNo: nextCustomerNo,
+        customerNo: custNo.trim(), // Formdaki mevcut veya elle düzeltilmiş noyu alır
         name: custName.trim(),
         phone: custPhone.trim(),
         address: custAddress.trim(),
@@ -153,6 +161,10 @@ export default function StaffAndCustomerModule({
 
   const handleEditCustomerClick = (cust: any) => {
     setEditingCustomerId(cust.id);
+    
+    // Düzenlemeye tıklandığında mevcut Müşteri Nosunu kutuya doldur
+    setCustNo(cust.customerNo || ''); 
+    
     setCustName(cust.name || '');
     setCustPhone(cust.phone || '');
     setCustAddress(cust.address || '');
@@ -200,6 +212,7 @@ export default function StaffAndCustomerModule({
   if (mode === 'staff') {
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
         {/* SOL: PERSONEL FORM */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-4">
           <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
@@ -363,6 +376,7 @@ export default function StaffAndCustomerModule({
       
       {/* SOL TARAF: MÜŞTERİ KAYIT / DÜZENLEME FORMU */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-4">
+        
         <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
           <span className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center text-lg font-bold shadow-inner">
             🤝
@@ -371,11 +385,28 @@ export default function StaffAndCustomerModule({
             <h2 className="text-base font-black text-slate-900">
               {editingCustomerId ? 'Müşteri Kartını Güncelle' : 'Yeni Müşteri Kartı Aç'}
             </h2>
-            <p className="text-xs font-medium text-slate-500">Müşteri numarası otomatik atanır.</p>
+            <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+              Müşteri numarası (ETK) manuel değiştirilebilir.
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleAddOrUpdateCustomer} className="space-y-4">
+          
+          {/* İŞTE YENİ EKLENEN MANUEL ETK NUMARASI KUTUSU */}
+          <div className="p-3.5 bg-slate-900 rounded-xl border border-slate-800 shadow-inner">
+            <label className="text-[11px] font-black text-slate-300 flex items-center gap-1.5 mb-1.5 uppercase tracking-wider">
+              <span>🆔</span> Müşteri Numarası 
+            </label>
+            <input
+              type="text"
+              value={custNo}
+              onChange={e => setCustNo(e.target.value)}
+              className="w-full p-2.5 rounded-lg border-none text-sm font-black bg-slate-800 text-emerald-400 outline-none focus:ring-2 focus:ring-purple-500/50 transition-all uppercase tracking-widest"
+              required
+            />
+          </div>
+
           <div>
             <label className="text-xs font-extrabold text-slate-700">Müşteri Adı Soyadı / Firma *</label>
             <input
@@ -497,6 +528,7 @@ export default function StaffAndCustomerModule({
 
       {/* SAĞ TARAF: ARAMA ÇUBUĞU VE MÜŞTERİ LİSTESİ */}
       <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-3">
           <div>
             <h3 className="text-base font-black text-slate-900">Kayıtlı Müşteri Veritabanı (CRM)</h3>
@@ -539,6 +571,7 @@ export default function StaffAndCustomerModule({
         ) : (
           <div className="space-y-4 max-h-[650px] overflow-y-auto pr-2 custom-scrollbar">
             {filteredCustomers.map((cust: any) => {
+              
               // Müşterinin kaç siparişi var hesapla
               const custOrders = ordersList.filter(
                 o =>
@@ -557,7 +590,7 @@ export default function StaffAndCustomerModule({
                     
                     {/* Üst Bilgi Satırı: ETK No, İsim ve Hizmet Rozetleri */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-slate-900 text-white shadow-sm tracking-wide">
+                      <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-slate-900 text-emerald-400 shadow-sm tracking-wide border border-slate-700">
                         {cust.customerNo || 'ETK-000'}
                       </span>
                       
@@ -642,6 +675,7 @@ export default function StaffAndCustomerModule({
           </div>
         )}
       </div>
+
     </div>
   );
 }
