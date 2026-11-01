@@ -103,11 +103,9 @@ export default function OrdersModule({
     const selectedCust = customerList.find(c => c.id === selectedCustId);
     if (!selectedCust) return;
 
-    // Tarihi Takvim İçin "04.11.2026" Şeklinde Çevirme
     const dateParts = orderDateInput.split('-');
     const formattedDate = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.${dateParts[0]}` : orderDateInput;
 
-    // TAKVİM SENKRONİZASYON FONKSİYONU (Hem yeni kayıtta hem düzenlemede çalışır)
     const syncCalendar = () => {
       if (jobType === 'Ev Temizliği' && staffId && setCalendarData && dateParts.length === 3) {
         const selectedStaff = staffList.find(s => s.id === staffId);
@@ -118,7 +116,7 @@ export default function OrdersModule({
             [calendarDateKey]: {
               ...(prev[calendarDateKey] || {}),
               [selectedStaff.name]: {
-                status: 'Asistan',
+                status: status === 'Teslim Edildi' ? 'Tamamlandı' : (status === 'İşlemde' ? 'İşlemde' : 'Asistan'),
                 customerName: selectedCust.name,
                 jobType: 'Daire',
                 duration: 'Tam Gün',
@@ -149,13 +147,13 @@ export default function OrdersModule({
                 description: desc,
                 price: Number(price) || 0,
                 staffPayment: staffPayment ? Number(staffPayment) : undefined,
-                orderStatus: status,
+                orderStatus: status, // KULLANICININ FORMDA SEÇTİĞİ DURUM EKLENDİ
                 staffId: staffId || undefined
               }
             : o
         )
       );
-      syncCalendar(); // Düzenlemede de takvimi güncelle
+      syncCalendar();
     } else {
       const existingOrders = ordersList.map((o: any) => {
         const match = (o.orderNo || '').match(/ZEY-(\d+)/);
@@ -181,7 +179,7 @@ export default function OrdersModule({
       };
 
       setOrdersList(prev => [newOrder, ...prev]);
-      syncCalendar(); // Yeni kayıtta takvimi güncelle
+      syncCalendar();
     }
 
     setIsOrderModalOpen(false);
@@ -274,7 +272,6 @@ export default function OrdersModule({
                       <span className="text-slate-400">|</span>
                       <span>📅 {o.date}</span>
                       
-                      {/* EKLENEN KISIM: PERSONEL İSMİ EKRANDA GÖSTERİLİYOR */}
                       {assignedStaff && (
                         <span className="bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded border border-indigo-200 shadow-sm ml-1 flex items-center gap-1">
                           👤 {assignedStaff.name}
@@ -461,7 +458,8 @@ export default function OrdersModule({
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 4 SÜTUNLU YENİ DÜZENLEME (DURUM KUTUSU EKLENDİ) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700">İşlem Tarihi</label>
                   <input
@@ -493,8 +491,21 @@ export default function OrdersModule({
                     onChange={e => setStaffId(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-teal-600 cursor-pointer"
                   >
-                    <option value="">-- Personel Seç (Opsiyonel) --</option>
+                    <option value="">-- Personel Seç --</option>
                     {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700">İşlem Durumu</label>
+                  <select
+                    value={status}
+                    onChange={e => setStatus(e.target.value as any)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold mt-1 outline-none focus:border-teal-600 cursor-pointer bg-slate-50"
+                  >
+                    <option value="Bekliyor">Bekliyor</option>
+                    <option value="İşlemde">İşlemde (Halı Yıkanıyor vb.)</option>
+                    <option value="Teslim Edildi">Teslim Edildi (Geçmişe Atar)</option>
+                    <option value="İptal">İptal Edildi (Geçmişe Atar)</option>
                   </select>
                 </div>
               </div>
