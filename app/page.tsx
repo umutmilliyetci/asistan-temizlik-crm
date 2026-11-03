@@ -160,7 +160,6 @@ export default function AsistanMasterCRM() {
           setIsAuthenticated(true);
         }
 
-        // 1. Önce yerel verileri yükle (hızlı açılış ve yedek için)
         const storedPass = localStorage.getItem('asistan_admin_pass_v1');
         if (storedPass) setSavedPassword(storedPass);
 
@@ -180,7 +179,6 @@ export default function AsistanMasterCRM() {
         if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
         if (savedCalendar) setCalendarData(JSON.parse(savedCalendar));
 
-        // 2. Supabase Bulutta kayıt varsa onu çek ve üstüne yaz
         await fetchFromSupabase();
       } catch (err) {
         console.error('Veriler yüklenirken hata:', err);
@@ -296,36 +294,22 @@ export default function AsistanMasterCRM() {
 
   const totalPricesCount = priceCategories.reduce((acc, cat) => acc + cat.items.length, 0);
 
-  const filteredOrders = ordersList.filter(o => {
-    if (dateFilter === 'today') {
-      return o.date === todayStr || o.date === '24.10.2026' || o.date === '19.10.2026';
-    }
-    return true;
-  });
-
-  const getOrderCost = (o: any) => {
-    if (o.staffPayment !== undefined && o.staffPayment !== '') return Number(o.staffPayment);
-    if (o.fasonCost !== undefined && o.fasonCost !== '') return Number(o.fasonCost);
-    const amount = Number(o.price || o.totalAmount || 0);
-    return Math.round(amount * 0.65);
-  };
-
-  const activeOrders = filteredOrders.filter(o => o.orderStatus !== 'Teslim Edildi' && o.orderStatus !== 'İptal');
-  const activeTurnover = activeOrders.reduce((acc, o: any) => acc + Number(o.price || o.totalAmount || 0), 0);
-  const activeFasonHakedis = activeOrders.reduce((acc, o: any) => acc + getOrderCost(o), 0);
-
-  const deliveredOrders = filteredOrders.filter(o => o.orderStatus === 'Teslim Edildi');
-  const deliveredTurnover = deliveredOrders.reduce((acc, o: any) => acc + Number(o.price || o.totalAmount || 0), 0);
-  const deliveredFasonHakedis = deliveredOrders.reduce((acc, o: any) => acc + getOrderCost(o), 0);
-
-  const manualIncome = transactions.filter(t => t.category === 'Gelir').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-  const manualOutflow = transactions.filter(t => t.category === 'Fason Hakediş' || t.category === 'Personel Ödemesi').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-  const totalExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount || 0), 0) + 
-                        transactions.filter(t => t.category === 'Gider').reduce((acc, t) => acc + Number(t.amount || 0), 0);
-
-  const netCompanyCash = (deliveredTurnover + manualIncome) - (deliveredFasonHakedis + manualOutflow + totalExpenses);
-
   const periodicCustomers = customerList.filter((c: any) => c.period && c.period !== 'Yok');
+
+  const netCompanyCash = useMemo(() => {
+    const deliveredOrders = ordersList.filter((o: any) => o.orderStatus === 'Teslim Edildi');
+    const deliveredTurnover = deliveredOrders.reduce((acc, o: any) => acc + Number(o.price || o.totalAmount || 0), 0);
+    const deliveredPayouts = deliveredOrders.reduce((acc, o: any) => {
+      const cost = o.staffPayment !== undefined ? Number(o.staffPayment) : Math.round(Number(o.price || o.totalAmount || 0) * 0.65);
+      return acc + cost;
+    }, 0);
+
+    const manualIncome = transactions.filter(t => t.category === 'Gelir').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+    const manualExpenses = transactions.filter(t => t.category === 'Gider' || t.category === 'Fason Hakediş' || t.category === 'Personel Ödemesi').reduce((acc, t) => acc + Number(t.amount || 0), 0);
+    const totalExpenses = expenses.reduce((acc, exp) => acc + Number(exp.amount || 0), 0);
+
+    return (deliveredTurnover + manualIncome) - (deliveredPayouts + manualExpenses + totalExpenses);
+  }, [ordersList, transactions, expenses]);
 
   const dashboardCards = [
     {
@@ -415,8 +399,8 @@ export default function AsistanMasterCRM() {
     {
       id: 'reports' as TabType,
       title: 'Yönetici Raporları & Analiz',
-      badge: 'Canlı Rakamlar',
-      description: 'Günlük, aylık ve yıllık bazda tüm ciro, fason/personel ödemeleri ve net kârlılık rakamlarını görün.',
+      badge: 'Patron Kokpiti',
+      description: '5 gelir merkezi, 12 gider kalemi, büyüme simülatörü ve canlı finansal kârlılık kokpiti.',
       icon: '📊',
       gradient: 'from-slate-700 to-slate-900',
       lightBg: 'bg-slate-100/80',
@@ -653,7 +637,7 @@ export default function AsistanMasterCRM() {
             )}
             {syncStatus === 'error' && (
               <span className="text-rose-400 font-bold flex items-center gap-1">
-                ⚠️ Bulut Bağlantı Uyarısı (SQL Tablosunu Kontrol Edin)
+                ⚠️ Bulut Bağlantı Uyarısı
               </span>
             )}
             {syncStatus === 'idle' && (
@@ -721,7 +705,7 @@ export default function AsistanMasterCRM() {
                 </div>
                 <button
                   onClick={() => setActiveTab('customers')}
-                  className="bg-white text-purple-950 hover:bg-purple-50 px-5 py-3 rounded-2xl text-xs font-black shadow-md transition-all whitespace-nowrap uppercase tracking-wider"
+                  className="bg-white text-purple-950 hover:bg-purple-50 px-5 py-3 rounded-2xl text-xs font-black shadow-md transition-all whitespace-nowrap uppercase tracking-wider cursor-pointer"
                 >
                   Müşteri Listesini Aç →
                 </button>
@@ -774,95 +758,13 @@ export default function AsistanMasterCRM() {
           </div>
         )}
 
+        {/* YENİ GELİŞMİŞ 12 GİDER KATEGORİLİ KASA & FİNANS MODÜLÜ */}
         {activeTab === 'finance' && (
-          <div className="space-y-6 bg-slate-50/50 p-6 rounded-3xl border border-slate-200/80">
-            
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm gap-4">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Kasa & Finansal Akış Paneli</h2>
-                <p className="text-xs text-slate-500">Devam eden işler, gerçekleşen tahsilatlar, ödemeler ve net kasa durumu.</p>
-              </div>
-              <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button 
-                  onClick={() => setDateFilter('today')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    dateFilter === 'today' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Bugün
-                </button>
-                <button 
-                  onClick={() => setDateFilter('monthly')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    dateFilter === 'monthly' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Aylık / Tüm Liste
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">1. Devam Eden İşler (Bekleyen / Alınacak Ödemeler)</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-                  <p className="text-xs font-medium text-slate-500">Aktif İş Emri</p>
-                  <h3 className="text-2xl font-black text-amber-600 mt-1">{activeOrders.length} İş</h3>
-                  <p className="text-[10px] text-slate-400">Atölyede / Sahada işleniyor</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-                  <p className="text-xs font-medium text-slate-500">Beklenen Ciro</p>
-                  <h3 className="text-2xl font-black text-blue-600 mt-1">{activeTurnover.toLocaleString('tr-TR')} ₺</h3>
-                  <p className="text-[10px] text-slate-400">Tahsil edilecek toplam tutar</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1 border-l-4 border-l-amber-500">
-                  <p className="text-xs font-medium text-slate-500">Ödenecek Personel/Fason</p>
-                  <h3 className="text-2xl font-black text-amber-700 mt-1">{activeFasonHakedis.toLocaleString('tr-TR')} ₺</h3>
-                  <p className="text-[10px] text-slate-400">Net personel & fason maliyeti</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-                  <p className="text-xs font-medium text-slate-500">Beklenen Net Kâr</p>
-                  <h3 className="text-2xl font-black text-slate-700 mt-1">{(activeTurnover - activeFasonHakedis).toLocaleString('tr-TR')} ₺</h3>
-                  <p className="text-[10px] text-slate-400">İşler bittiğinde kalacak tutar</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">2. Teslim Edilen İşler (Gerçekleşen Tahsilatlar & Kasa)</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-slate-100/80 p-5 rounded-3xl border border-slate-200">
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-                  <p className="text-xs font-medium text-slate-500">Teslim Edilen İş</p>
-                  <h3 className="text-2xl font-black text-emerald-600 mt-1">{deliveredOrders.length} İş</h3>
-                  <p className="text-[10px] text-slate-400">Müşteriye teslim edildi</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-                  <p className="text-xs font-medium text-slate-500">Tahsil Edilen Ciro</p>
-                  <h3 className="text-2xl font-black text-emerald-700 mt-1">{deliveredTurnover.toLocaleString('tr-TR')} ₺</h3>
-                  <p className="text-[10px] text-slate-400">Kasaya giren toplam</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1 border-l-4 border-l-emerald-500">
-                  <p className="text-xs font-medium text-slate-500">Ödenen Personel/Fason</p>
-                  <h3 className="text-2xl font-black text-teal-700 mt-1">{deliveredFasonHakedis.toLocaleString('tr-TR')} ₺</h3>
-                  <p className="text-[10px] text-slate-400">Personel ve atölye ödemeleri</p>
-                </div>
-                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1 bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none">
-                  <p className="text-xs font-medium text-slate-300">Net Şirket Kasası (Kâr)</p>
-                  <h3 className="text-2xl font-black text-emerald-400 mt-1">
-                    {netCompanyCash.toLocaleString('tr-TR')} ₺
-                  </h3>
-                  <p className="text-[10px] text-slate-400">Giderler düşüldükten sonra net</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
+          <FinanceModule 
+            ordersList={ordersList}
+            transactions={transactions}
+            setTransactions={setTransactions}
+          />
         )}
 
         {activeTab === 'prices' && (
@@ -959,8 +861,8 @@ export default function AsistanMasterCRM() {
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsChangePassModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">İptal</button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-teal-600 text-white text-xs font-extrabold">Şifreyi Güncelle</button>
+                <button type="button" onClick={() => setIsChangePassModalOpen(false)} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer">İptal</button>
+                <button type="submit" className="px-5 py-2 rounded-xl bg-teal-600 text-white text-xs font-extrabold cursor-pointer">Şifreyi Güncelle</button>
               </div>
             </form>
           </div>
@@ -981,7 +883,7 @@ export default function AsistanMasterCRM() {
               </div>
               <button 
                 onClick={() => setIsLocationModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -1020,7 +922,7 @@ export default function AsistanMasterCRM() {
               <button 
                 type="button" 
                 onClick={() => setIsLocationModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 cursor-pointer"
               >
                 Vazgeç
               </button>
@@ -1039,7 +941,7 @@ export default function AsistanMasterCRM() {
                   setIsLocationModalOpen(false);
                   setLocationPhone('');
                 }}
-                className="px-6 py-2.5 rounded-xl bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-extrabold shadow-md flex items-center gap-2"
+                className="px-6 py-2.5 rounded-xl bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-extrabold shadow-md flex items-center gap-2 cursor-pointer"
               >
                 <span>🚀</span> WhatsApp ile Konum Gönder
               </button>
