@@ -9,7 +9,6 @@ interface FinanceModuleProps {
   setTransactions: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-// 12 GENEL GİDER KATEGORİSİ VE DİĞER SEÇENEKLER
 const EXPENSE_CATEGORIES = [
   'Kira',
   'Elektrik',
@@ -31,14 +30,11 @@ export default function FinanceModule({
   setTransactions,
 }: FinanceModuleProps) {
   
-  // STATE'LER
   const [category, setCategory] = useState<'Gelir' | 'Gider' | 'Fason Hakediş' | 'Personel Ödemesi'>('Gelir');
   const [subCategory, setSubCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  // SAĞ TARAFTAKİ LİSTEYİ İNCELEMEK / FİLTRELEMEK İÇİN KATEGORİ FİLTRESİ
   const [filterCategory, setFilterCategory] = useState('Tümü');
 
   const handleAddOrUpdateTransaction = (e: React.FormEvent) => {
@@ -46,7 +42,6 @@ export default function FinanceModule({
     if (!description.trim() || !amount) return;
 
     if (editingId) {
-      // MEVCUT İŞLEMİ GÜNCELLE
       setTransactions(prev =>
         prev.map((t: any) =>
           t.id === editingId
@@ -62,7 +57,6 @@ export default function FinanceModule({
       );
       setEditingId(null);
     } else {
-      // YENİ İŞLEM EKLE
       const newTx = {
         id: `TX-${Date.now()}`,
         category,
@@ -84,12 +78,7 @@ export default function FinanceModule({
     setCategory(tx.category || 'Gelir');
     if (tx.subCategory) setSubCategory(tx.subCategory);
     setDescription(tx.description || '');
-    setValueAmount(tx.amount);
-  };
-
-  // setAmount helper
-  const setValueAmount = (val: any) => {
-    setAmount(String(val || ''));
+    setAmount(String(tx.amount || ''));
   };
 
   const handleCancelEdit = () => {
@@ -105,14 +94,12 @@ export default function FinanceModule({
     }
   };
 
-  // FİLTRELENMİŞ HAREKETLER
   const filteredTransactions = transactions.filter((t: any) => {
     if (filterCategory === 'Tümü') return true;
     if (t.subCategory === filterCategory || t.category === filterCategory) return true;
     return false;
   });
 
-  // HESAPLAMALAR
   const deliveredOrders = ordersList.filter((o: any) => o.orderStatus === 'Teslim Edildi');
   const deliveredTurnover = deliveredOrders.reduce((acc, o: any) => acc + Number(o.price || o.totalAmount || 0), 0);
   const deliveredPayouts = deliveredOrders.reduce((acc, o: any) => {
@@ -130,7 +117,6 @@ export default function FinanceModule({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4">
       
-      {/* SOL: GİDER / İŞLEM EKLEME VEYA DÜZENLEME FORMU */}
       <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-fit space-y-5">
         <div className="border-b border-slate-100 pb-3">
           <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200">
@@ -158,7 +144,6 @@ export default function FinanceModule({
             </select>
           </div>
 
-          {/* EĞER İŞLEM TÜRÜ GİDER SEÇildİYSE 12'Lİ OKLA AÇILAN KATEGORİ MENÜSÜ ÇIKAR */}
           {category === 'Gider' && (
             <div className="space-y-1 p-3 bg-amber-50/50 rounded-2xl border border-amber-200">
               <label className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
@@ -220,7 +205,6 @@ export default function FinanceModule({
         </form>
       </div>
 
-      {/* SAĞ: KASA ÖZETİ VE FİLTRELENEBİLİR HAREKET GEÇMİŞİ */}
       <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
         
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-4 gap-3">
@@ -229,7 +213,6 @@ export default function FinanceModule({
             <p className="text-xs text-slate-500">Tüm giriş ve çıkışların net bakiye dökümü.</p>
           </div>
 
-          {/* YANDAN OKLA AÇILAN KATEGORİ İNCELEME FİLTRESİ */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-600">Kategoriye Göre İncele:</span>
             <select
@@ -250,7 +233,6 @@ export default function FinanceModule({
           </div>
         </div>
 
-        {/* Özet Kartları */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-emerald-50/70 p-5 rounded-2xl border border-emerald-200">
             <span className="text-[10px] font-extrabold text-emerald-800 uppercase block">Toplam Kasa Girişi</span>
@@ -266,7 +248,6 @@ export default function FinanceModule({
           </div>
         </div>
 
-        {/* Hareketler Listesi */}
         <div className="space-y-3 pt-2">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
